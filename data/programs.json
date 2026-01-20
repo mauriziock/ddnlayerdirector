@@ -1,0 +1,89 @@
+{
+  "default_program": {
+    "id": "default_program",
+    "name": "Default Blank",
+    "description": "A clean slate with standard triggers.",
+    "layers_template": [],
+    "triggers": [
+      {
+        "id": "live",
+        "name": "LIVE Mode",
+        "action": "class_toggle",
+        "target": "body",
+        "value": "mode-live"
+      },
+      {
+        "id": "brb",
+        "name": "Be Right Back",
+        "action": "visibility",
+        "target": "overlay-brb",
+        "value": true
+      }
+    ]
+  },
+  "demo": {
+    "id": "demo",
+    "name": "demo",
+    "description": "New custom program",
+    "layers_template": [],
+    "triggers": []
+  },
+  "stark_hud": {
+    "id": "stark_hud",
+    "name": "Stark HUD (Default)",
+    "description": "Premium Iron-Man style HUD with dynamic states.",
+    "layers_template": [
+      {
+        "id": "hud_main",
+        "type": "web_source",
+        "url": "/stark_hud.html",
+        "z_index": 100,
+        "position": {
+          "x": 0,
+          "y": 0,
+          "width": 100,
+          "height": 100
+        },
+        "opacity": 1,
+        "visible": true
+      }
+    ],
+    "triggers": [
+      {
+        "id": "idle",
+        "name": "System Idle",
+        "action": "class_toggle",
+        "target": "body",
+        "value": "state-idle"
+      },
+      {
+        "id": "warning",
+        "name": "Caution State",
+        "action": "class_toggle",
+        "target": "body",
+        "value": "state-warning"
+      },
+      {
+        "id": "critical",
+        "name": "System Failure",
+        "action": "class_toggle",
+        "target": "body",
+        "value": "state-critical"
+      },
+      {
+        "id": "glitch",
+        "name": "Visual Glitch",
+        "action": "trigger",
+        "target": "hud_main",
+        "value": "glitch"
+      },
+      {
+        "id": "alert",
+        "name": "Show Alert",
+        "action": "trigger",
+        "target": "hud_main",
+        "value": "alert"
+      }
+    ]
+  }
+}

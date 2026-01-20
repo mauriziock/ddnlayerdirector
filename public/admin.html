@@ -1,0 +1,2088 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Hangar Director</title>
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI&display=swap" rel="stylesheet">
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body {
+            background: #0a0a0b;
+            color: #eee;
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        /* GLOBAL NAV (CasaOS Style) */
+        nav.global-nav {
+            width: 70px;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px 0;
+            z-index: 1000;
+        }
+
+        .nav-item {
+            width: 45px;
+            height: 45px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: rgba(255, 255, 255, 0.05);
+            color: #666;
+            text-decoration: none;
+        }
+
+        .nav-item:hover,
+        .nav-item.active {
+            background: rgba(255, 255, 255, 0.1);
+            color: #00f3ff;
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
+        }
+
+        .nav-item svg {
+            width: 22px;
+            height: 22px;
+            fill: currentColor;
+        }
+
+        /* SIDEBAR */
+        #sidebar {
+            width: 320px;
+            background: #111;
+            border-right: 1px solid #000;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+
+        .header {
+            padding: 15px;
+            background: #111;
+            border-bottom: 2px solid #00f3ff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h3 {
+            margin: 0;
+            font-size: 14px;
+            letter-spacing: 1px;
+            color: #fff;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #0f0;
+            border-radius: 50%;
+            box-shadow: 0 0 5px #0f0;
+        }
+
+        /* LAYER LIST */
+        .target-btn {
+            flex: 1;
+            padding: 6px;
+            font-size: 10px;
+            background: #111;
+            border: 1px solid #333;
+            color: #666;
+            cursor: pointer;
+            font-weight: bold;
+            border-radius: 4px;
+        }
+
+        .target-btn.active {
+            background: #00f3ff;
+            color: #000;
+            border-color: #00f3ff;
+        }
+
+        .layer-panel {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            border-bottom: 1px solid #000;
+            min-height: 200px;
+        }
+
+        .panel-header {
+            padding: 8px 10px;
+            background: #222;
+            font-size: 11px;
+            font-weight: bold;
+            color: #888;
+            border-bottom: 1px solid #000;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .layer-list {
+            flex-grow: 1;
+            overflow-y: auto;
+            background: #222;
+        }
+
+        .layer-item {
+            padding: 8px 10px;
+            border-bottom: 1px solid #2a2a2a;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 13px;
+            color: #bfbfbf;
+            user-select: none;
+        }
+
+        .layer-item:hover {
+            background: #333;
+        }
+
+        .layer-item.selected {
+            background: #00f3ff;
+            color: #000;
+            font-weight: bold;
+        }
+
+        .layer-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .layer-actions {
+            display: flex;
+            gap: 4px;
+            opacity: 0.5;
+        }
+
+        .layer-item:hover .layer-actions {
+            opacity: 1;
+        }
+
+        .icon-btn {
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            color: inherit;
+            font-size: 12px;
+            padding: 2px;
+        }
+
+        .icon-btn:hover {
+            color: #fff;
+        }
+
+        .panel-toolbar {
+            display: flex;
+            background: #1a1a1a;
+            padding: 5px;
+            gap: 5px;
+        }
+
+        .panel-toolbar button {
+            flex: 1;
+            background: #333;
+            border: none;
+            color: #fff;
+            padding: 6px;
+            cursor: pointer;
+            border-radius: 2px;
+            font-size: 12px;
+        }
+
+        .panel-toolbar button:hover {
+            background: #444;
+        }
+
+        /* PROPERTIES */
+        .properties-panel {
+            padding: 15px;
+            background: #2b2b2b;
+        }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .controls-grid label {
+            font-size: 10px;
+            color: #888;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .controls-grid input {
+            width: 100%;
+            background: #111;
+            border: 1px solid #444;
+            color: #00f3ff;
+            padding: 4px;
+            font-family: monospace;
+            border-radius: 2px;
+        }
+
+        /* MODAL */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 10000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: #2b2b2b;
+            padding: 20px;
+            width: 300px;
+            border: 1px solid #00f3ff;
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.2);
+        }
+
+        .modal h4 {
+            margin-top: 0;
+            color: #00f3ff;
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 11px;
+            color: #888;
+            margin-bottom: 4px;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 6px;
+            background: #111;
+            border: 1px solid #444;
+            color: #fff;
+            box-sizing: border-box;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            cursor: pointer;
+            border: none;
+            font-weight: bold;
+        }
+
+        .btn-cancel {
+            background: #444;
+            color: #ccc;
+        }
+
+        .btn-confirm {
+            background: #00f3ff;
+            color: #000;
+        }
+
+        .btn:disabled {
+            background: #222 !important;
+            color: #555 !important;
+            cursor: not-allowed;
+            border: 1px solid #333;
+        }
+
+        /* WORKSPACE */
+        #workspace {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: #0a0a0a;
+            perspective: 1000px;
+        }
+
+        #virtual-canvas {
+            width: 360px;
+            height: 640px;
+            /* 1080x1920 scale */
+            background: #000;
+            border: 1px solid #333;
+            position: relative;
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+            transform-origin: center center;
+            transition: transform 0.1s ease-out;
+        }
+
+        #zoom-controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 100;
+        }
+
+        .zoom-btn {
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid #444;
+            color: #00f3ff;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 14px;
+            backdrop-filter: blur(5px);
+        }
+
+        .zoom-btn:hover {
+            background: rgba(0, 243, 255, 0.1);
+            border-color: #00f3ff;
+        }
+
+        .proxy-layer {
+            position: absolute;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.05);
+            cursor: move;
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .proxy-layer.hidden {
+            opacity: 0.2;
+            border-style: dashed;
+        }
+
+        .proxy-layer.locked {
+            border-color: #00f3ff;
+            border-style: dashed;
+            opacity: 0.5;
+        }
+
+        .proxy-label {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.5);
+            pointer-events: none;
+            text-align: center;
+            overflow: hidden;
+        }
+
+        /* GIZMO */
+        #selection-gizmo {
+            position: absolute;
+            border: 2px solid #00f3ff;
+            background: rgba(0, 243, 255, 0.1);
+            z-index: 9999;
+            cursor: move;
+            pointer-events: auto !important;
+            box-sizing: border-box;
+        }
+
+        /* BUTTONS */
+        .btn {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            color: #eee;
+            padding: 8px 15px;
+            cursor: pointer;
+            font-size: 12px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background: #333;
+            border-color: #666;
+        }
+
+        .btn-confirm {
+            background: rgba(0, 243, 255, 0.1);
+            border-color: #00f3ff;
+            color: #00f3ff;
+        }
+
+        .btn-confirm:hover {
+            background: rgba(0, 243, 255, 0.2);
+        }
+
+        .btn-cancel {
+            background: #222;
+            border-color: #444;
+            color: #888;
+        }
+
+        .btn-cancel:hover {
+            background: #333;
+            color: #fff;
+        }
+
+        .control-panel {
+            background: #222;
+            border: 1px solid #000;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moveable/0.53.0/moveable.min.js"></script>
+    <style>
+        /* CHROME TABS SYSTEM */
+        #workspace-header {
+            width: 100%;
+            background: #111;
+            border-bottom: 1px solid #333;
+            display: flex;
+            align-items: flex-end;
+            padding: 0 10px;
+            height: 35px;
+            gap: 2px;
+        }
+
+        .chrome-tab {
+            background: #222;
+            color: #888;
+            padding: 8px 15px;
+            border-radius: 8px 8px 0 0;
+            font-size: 11px;
+            cursor: pointer;
+            position: relative;
+            user-select: none;
+            transition: all 0.2s;
+            max-width: 150px;
+            min-width: 80px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border: 1px solid transparent;
+            border-bottom: none;
+            margin-bottom: -1px;
+        }
+
+        .chrome-tab:hover {
+            background: #2a2a2a;
+            color: #ccc;
+        }
+
+        .chrome-tab.active {
+            background: #00f3ff;
+            color: #000;
+            font-weight: bold;
+            border-color: #333;
+            z-index: 5;
+        }
+
+        .chrome-tab-close {
+            margin-left: 8px;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            opacity: 0.5;
+        }
+
+        .chrome-tab-close:hover {
+            background: rgba(0, 0, 0, 0.2);
+            opacity: 1;
+        }
+
+        .chrome-tab-add {
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: #888;
+            border-radius: 4px;
+            margin-bottom: 7px;
+            /* Align with tab height */
+            font-size: 16px;
+            background: rgba(255, 255, 255, 0.05);
+            margin-left: 4px;
+        }
+
+        .chrome-tab-add:hover {
+            background: rgba(255, 255, 255, 0.15);
+            color: #fff;
+        }
+
+        /* MANAGER LIST */
+        .channel-list-item {
+            background: #111;
+            padding: 10px;
+            margin-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid #333;
+        }
+
+        .channel-list-item:hover {
+            border-color: #00f3ff;
+        }
+
+        .icon-btn {
+            background: none;
+            border: none;
+            color: #888;
+            cursor: pointer;
+            padding: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            border-radius: 4px;
+        }
+
+        .icon-btn:hover {
+            color: #00f3ff;
+            background: rgba(0, 243, 255, 0.1);
+        }
+    </style>
+
+</head>
+
+<body>
+    <nav class="global-nav">
+        <a href="/admin.html" class="nav-item active" title="Director">
+            <svg viewBox="0 0 24 24">
+                <path d="M10,20V14H14V20H19V12H22L12,3L2,12H5V20H10Z" />
+            </svg>
+        </a>
+        <a href="/programs.html" class="nav-item" title="Programs">
+            <svg viewBox="0 0 24 24">
+                <path
+                    d="M12,18.54L19.37,12.8L21,14.07L12,21.07L3,14.07L4.62,12.81L12,18.54M12,16L3,9L12,2L21,9L12,16Z" />
+            </svg>
+        </a>
+        <a href="/devices.html" class="nav-item" title="Devices Hub">
+            <svg viewBox="0 0 24 24">
+                <path
+                    d="M4,6H20V16H4M20,18A2,2 0 0,0 22,16V6C22,4.89 21.1,4 20,4H4C2.89,4 2,4.89 2,6V16A2,2 0 0,0 4,18H0V20H24V18H20Z" />
+            </svg>
+        </a>
+    </nav>
+    <div id="sidebar">
+        <div class="header">
+            <h3>HANGAR DIRECTOR</h3>
+            <div class="status-dot"></div>
+        </div>
+
+        <div style="padding: 10px; background: #222; border-bottom: 1px solid #000; display: flex; gap: 5px;">
+            <button id="btn-channels" class="target-btn" onclick="openChannelManager()"
+                style="width:100%">CHANNELS</button>
+        </div>
+
+        <div class="layer-panel">
+            <div class="panel-header">
+                SOURCES
+                <span id="source-count" style="font-weight:normal">0</span>
+            </div>
+            <div id="layer-list" class="layer-list"></div>
+            <div class="panel-toolbar">
+                <button onclick="openAddModal()">+ ADD SOURCE</button>
+                <div style="width:1px; background:#222; margin:0 5px;"></div>
+                <button onclick="changeZIndex(1)" title="Raise">▲</button>
+                <button onclick="changeZIndex(-1)" title="Lower">▼</button>
+            </div>
+        </div>
+
+        <div class="properties-panel">
+            <div class="panel-header">TRANSFORM</div>
+            <div class="controls-grid">
+                <label>X <input type="number" id="inp-x" step="0.1"></label>
+                <label>Y <input type="number" id="inp-y" step="0.1"></label>
+                <label>W <input type="number" id="inp-w" step="0.1"></label>
+                <label>H <input type="number" id="inp-h" step="0.1"></label>
+                <label>R <input type="number" id="inp-r" step="1" title="Rotation (Deg)"></label>
+                <label style="grid-column: span 2;">OPACITY <input type="range" id="inp-opacity" min="0" max="1"
+                        step="0.01" style="width: 70%; margin-left: 10px;"><span id="val-opacity">1.0</span></label>
+                <label style="grid-column: span 2;">VOLUME <input type="range" id="inp-volume" min="0" max="1"
+                        step="0.01" style="width: 70%; margin-left: 10px;"><span id="val-volume">1.0</span></label>
+            </div>
+            <div style="margin-top:10px; font-size:11px; display:flex; justify-content:space-between; color:#666;">
+                <span>ID: <strong id="sel-id" style="color:#888">None</strong></span>
+                <span id="sel-type"></span>
+            </div>
+        </div>
+
+        <!-- PROGRAM CONTROLS -->
+        <div id="program-controls-panel" class="control-panel" style="margin-top:20px; display:none;">
+            <div class="panel-header" id="program-controls-title">PROGRAM CONTROLS</div>
+            <div id="program-triggers-list" style="padding:15px; display:flex; flex-direction:column; gap:10px;">
+                <!-- Triggers injected here -->
+            </div>
+        </div>
+    </div>
+
+    <div id="workspace">
+        <div id="workspace-header">
+            <div id="channel-tabs" style="display:flex; gap:2px;">
+                <!-- Tabs Injected Here -->
+            </div>
+            <div class="chrome-tab-add" onclick="openChannelSwitcher()" title="Open Channel Tab">+</div>
+        </div>
+        <div id="canvas-wrapper"
+            style="flex-grow:1; display:flex; flex-direction:column; justify-content:center; align-items:center; width:100%; overflow:auto; padding:20px;">
+            <div id="virtual-canvas">
+                <div id="layer-container"></div>
+                <div id="selection-gizmo" style="display:none;"></div>
+            </div>
+            <div style="margin-top:10px; color:#444; font-size:12px;" id="canvas-label">Waiting for channel selection...
+            </div>
+            <div id="zoom-controls">
+                <div class="zoom-btn" onclick="adjustZoom(0.1)" title="Zoom In">+</div>
+                <div class="zoom-btn" onclick="resetZoom()" title="Reset Zoom">⟲</div>
+                <div class="zoom-btn" onclick="adjustZoom(-0.1)" title="Zoom Out">−</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ADD SOURCE MODAL -->
+    <div id="add-modal" class="modal">
+        <div class="modal-content">
+            <h4>ADD NEW SOURCE</h4>
+            <div class="form-group">
+                <label>NAME (ID)</label>
+                <input type="text" id="add-id" placeholder="e.g. guest_camera">
+            </div>
+            <div class="form-group">
+                <label>TYPE</label>
+                <select id="add-type" onchange="updateAddForm()">
+                    <option value="device_video">Video Device (Camera/SRT)</option>
+                    <option value="local_video">Local Host Camera</option>
+                    <option value="web_source">Web Overlay (HTML/URL)</option>
+                    <option value="image_source">Image (JPG/PNG/GIF)</option>
+                    <option value="text_source">Static Text</option>
+                    <option value="webrtc_audio">Remote Audio (Mic)</option>
+                </select>
+            </div>
+
+            <!-- Type specific fields -->
+
+            <!-- DEVICE SELECTOR -->
+            <div id="field-device-select" class="form-group">
+                <label>SELECT DEVICE</label>
+                <select id="add-device-select">
+                    <option value="">Loading devices...</option>
+                </select>
+                <div style="font-size:10px; color:#666; margin-top:5px;">Manage devices in the <a href="/devices.html"
+                        style="color:#00f3ff">Devices Hub</a></div>
+            </div>
+
+            <!-- Manual Source ID (for Audio or Fallback) -->
+            <div id="field-source-id" class="form-group" style="display:none;">
+                <label>STREAM ID</label>
+                <input type="text" id="add-src-id" placeholder="e.g. mic_1">
+            </div>
+
+            <div id="field-url" class="form-group" style="display:none;">
+                <label>URL (Local path or HTTP)</label>
+                <input type="text" id="add-url" placeholder="/overlays/chat.html">
+            </div>
+            <div id="field-text" class="form-group" style="display:none;">
+                <label>TEXT CONTENT</label>
+                <input type="text" id="add-text" placeholder="Hangar 89 - Alpha">
+            </div>
+            <div id="field-image-url" class="form-group" style="display:none;">
+                <label>IMAGE URL</label>
+                <input type="text" id="add-image-url" placeholder="https://example.com/logo.png">
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="closeModal('add-modal')">CANCEL</button>
+                <button class="btn btn-confirm" onclick="submitAddSource()">CREATE</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- EDIT SOURCE MODAL -->
+    <div id="edit-modal" class="modal">
+        <div class="modal-content">
+            <h4>EDIT SOURCE</h4>
+            <input type="hidden" id="edit-id-hidden">
+            <div class="form-group">
+                <label>SOURCE ID / URL</label>
+                <input type="text" id="edit-val">
+            </div>
+
+            <div id="field-edit-rtsp" class="form-group" style="display:none;">
+                <label>RTSP STREAM URL</label>
+                <input type="text" id="edit-rtsp-val">
+            </div>
+
+            <div id="field-pref" class="form-group" style="display:none;">
+                <label>CAMERA LENS PREFERENCE</label>
+                <select id="edit-pref">
+                    <option value="">Loading devices...</option>
+                </select>
+                <div style="font-size:9px; color:#666; margin-top:4px;">Fetches live device list from source if
+                    available.</div>
+            </div>
+
+            <div id="field-res" class="form-group" style="display:none;">
+                <label>STREAM QUALITY (Bitrate)</label>
+                <select id="edit-res">
+                    <option value="">Default (Auto)</option>
+                    <option value="low">Low (Data Saver)</option>
+                    <option value="medium">Medium (Standard)</option>
+                    <option value="high">High (HD Quality)</option>
+                    <option value="ultra">Ultra (Original)</option>
+                </select>
+                <div style="font-size:9px; color:#666;">Controls bandwidth usage.</div>
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="closeModal('edit-modal')">CANCEL</button>
+                <button class="btn btn-confirm" onclick="submitEditSource()">SAVE & APPLY</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PROGRAM MANAGER MODAL -->
+    <div id="program-manager-modal" class="modal">
+        <div class="modal-content" style="width: 800px; height: 90vh; display:flex; flex-direction:column; padding:0;">
+            <div
+                style="background:#222; padding:15px; border-bottom:1px solid #444; display:flex; justify-content:space-between; align-items:center;">
+                <h4 style="margin:0;">PROGRAMS & THEMES</h4>
+                <button class="icon-btn" onclick="closeModal('program-manager-modal')">×</button>
+            </div>
+
+            <div style="flex-grow:1; display:flex; overflow:hidden;">
+                <!-- Sidebar List -->
+                <div
+                    style="width: 250px; background:#1a1a1a; border-right:1px solid #333; display:flex; flex-direction:column;">
+                    <div style="padding:10px; border-bottom:1px solid #333;">
+                        <button class="btn btn-confirm" style="width:100%; font-size:11px;"
+                            onclick="showCreateProgram()">+ NEW PROGRAM</button>
+                    </div>
+                    <div id="prog-list-container" style="flex-grow:1; overflow-y:auto; padding:10px;">
+                        <!-- Programs list -->
+                    </div>
+                </div>
+
+                <!-- Detail View -->
+                <div id="prog-detail-view" style="flex-grow:1; padding:20px; overflow-y:auto; display:none;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                        <h2 id="prog-detail-title" style="margin:0; color:#00f3ff;">Space Pilot</h2>
+                        <div>
+                            <button class="btn btn-cancel" onclick="openExperimentalSpace()">🧪 EXPERIMENT</button>
+                            <button class="btn btn-confirm" onclick="saveProgramChanges()">SAVE CHANGES</button>
+                        </div>
+                    </div>
+                    <p id="prog-detail-desc" style="color:#888; font-style:italic; margin-bottom:20px;"></p>
+
+                    <div class="panel-header" style="background:#222; margin-bottom:10px;">TRIGGERS & STATES</div>
+                    <div id="prog-triggers-container">
+                        <!-- Trigger List -->
+                    </div>
+                    <button class="icon-btn" style="margin-top:10px;" onclick="addTriggerRow()">+ Add Trigger</button>
+                </div>
+
+                <!-- Empty State -->
+                <div id="prog-empty-state"
+                    style="flex-grow:1; display:flex; align-items:center; justify-content:center; color:#666;">
+                    Select a program to edit
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- EXPERIMENTAL SPACE MODAL -->
+    <div id="experimental-space" class="modal" style="background: #000;">
+        <div style="display:flex; flex-direction:column; width:100%; height:100%;">
+            <div
+                style="height:50px; background:#111; border-bottom:1px solid #333; display:flex; align-items:center; padding:0 20px; justify-content:space-between;">
+                <h4 style="margin:0; color:#fff;">🧪 EXPERIMENTAL SPACE: <span id="exp-prog-name"
+                        style="color:#00f3ff;"></span></h4>
+                <button class="btn btn-cancel" onclick="closeModal('experimental-space')">EXIT LAB</button>
+            </div>
+            <div style="flex-grow:1; display:flex;">
+                <!-- Controls -->
+                <div style="width:300px; background:#1a1a1a; border-right:1px solid #333; padding:20px;">
+                    <h5 style="color:#888; margin-top:0;">TEST TRIGGERS</h5>
+                    <div id="exp-triggers-list" style="display:flex; flex-direction:column; gap:10px;">
+                        <!-- Trigger buttons injected here -->
+                    </div>
+                </div>
+                <!-- Preview -->
+                <div style="flex-grow:1; background:#000; position:relative;">
+                    <iframe id="exp-preview-frame" style="width:100%; height:100%; border:none;"></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CHANNEL MANAGER MODAL -->
+    <div id="channel-manager-modal" class="modal">
+        <div class="modal-content" style="width: 400px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h4>CHANNEL MANAGER</h4>
+                <button class="icon-btn" onclick="closeModal('channel-manager-modal')">×</button>
+            </div>
+
+            <div id="channel-list-container" style="max-height: 300px; overflow-y: auto; margin:15px 0;">
+                <!-- List -->
+            </div>
+
+            <button class="btn btn-confirm" style="width:100%;" onclick="toggleAddChannelForm()">+ ADD NEW
+                CHANNEL</button>
+
+            <div id="add-channel-form"
+                style="display:none; margin-top:15px; padding-top:15px; border-top:1px solid #444;">
+                <div class="form-group">
+                    <label>CHANNEL ID (e.g. main_transmision)</label>
+                    <input type="text" id="new-channel-id">
+                </div>
+                <div class="form-group">
+                    <label>DISPLAY NAME</label>
+                    <input type="text" id="new-channel-name">
+                </div>
+                <div class="form-group">
+                    <label>PROGRAM / THEME</label>
+                    <select id="new-channel-program">
+                        <!-- Programs injected here -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>RESOLUTION PRESET</label>
+                    <select id="new-channel-preset">
+                        <option value="v720">Vertical 720p (720x1280)</option>
+                        <option value="l720">Landscape 720p (1280x720)</option>
+                        <option value="v1080">Vertical 1080p (1080x1920)</option>
+                        <option value="l1080">Landscape 1080p (1920x1080)</option>
+                    </select>
+                </div>
+                <button class="btn btn-confirm" style="width:100%" onclick="submitCreateChannel()">CREATE
+                    CHANNEL</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CHANNEL SWITCHER MODAL (Simple Dropdown) -->
+    <div id="channel-switcher-modal" class="modal">
+        <div class="modal-content">
+            <h4>OPEN TAB</h4>
+            <div class="form-group">
+                <label>SELECT CHANNEL TO OPEN</label>
+                <select id="switcher-select">
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="closeModal('channel-switcher-modal')">CANCEL</button>
+                <button class="btn btn-confirm" onclick="confirmOpenTab()">OPEN</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let currentTarget = null; // No default until loaded
+        let openTabs = []; // Array of channel IDs that are "open" in tabs
+        let allChannels = []; // Cache of available channels
+        let allPrograms = []; // Cache of programs
+        let canvasZooms = {}; // Map of channelId -> zoomLevel
+        let canvasZoom = 1.0; // Current zoom for active channel
+
+        function adjustZoom(delta) {
+            canvasZoom = Math.min(Math.max(0.1, canvasZoom + delta), 5.0);
+            if (currentTarget) {
+                canvasZooms[currentTarget] = canvasZoom;
+                localStorage.setItem('hangar_canvas_zooms', JSON.stringify(canvasZooms));
+            }
+            updateCanvasTransform();
+        }
+
+        function resetZoom() {
+            canvasZoom = 1.0;
+            if (currentTarget) {
+                canvasZooms[currentTarget] = 1.0;
+                localStorage.setItem('hangar_canvas_zooms', JSON.stringify(canvasZooms));
+            }
+            updateCanvasTransform();
+        }
+
+        let moveable; // Declare globally in script scope
+
+        function updateCanvasTransform() {
+            const vCanvas = document.getElementById('virtual-canvas');
+            if (vCanvas) vCanvas.style.transform = `scale(${canvasZoom})`;
+            if (moveable) {
+                moveable.zoom = 1 / canvasZoom;
+                moveable.updateRect();
+            }
+        }
+
+        // Mouse wheel zoom
+        document.getElementById('canvas-wrapper').addEventListener('wheel', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? -0.1 : 0.1;
+                adjustZoom(delta);
+            }
+        }, { passive: false });
+
+        // --- UNDO / REDO SYSTEM ---
+        let undoStack = [];
+        let redoStack = [];
+        const MAX_HISTORY = 50;
+
+        function pushHistory() {
+            if (!currentScene) return;
+            // Deep clone current state
+            const snapshot = JSON.parse(JSON.stringify(currentScene));
+            undoStack.push(snapshot);
+            if (undoStack.length > MAX_HISTORY) undoStack.shift();
+            redoStack = []; // Clear redo on new action
+        }
+
+        function undo() {
+            if (undoStack.length === 0) return;
+            const previous = undoStack.pop();
+            // Save current to redo
+            redoStack.push(JSON.parse(JSON.stringify(currentScene)));
+
+            applyHistoryState(previous);
+        }
+
+        function redo() {
+            if (redoStack.length === 0) return;
+            const next = redoStack.pop();
+            // Push to undo
+            undoStack.push(JSON.parse(JSON.stringify(currentScene)));
+
+            applyHistoryState(next);
+        }
+
+        function applyHistoryState(state) {
+            currentScene = state;
+            // Sync with server
+            socket.emit('save_scene', {
+                target: currentTarget,
+                layout: currentScene
+            });
+            // Local update
+            renderEverything();
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key === 'z') {
+                    e.preventDefault();
+                    if (e.shiftKey) redo(); else undo();
+                } else if (e.key === 'y') {
+                    e.preventDefault();
+                    redo();
+                }
+            }
+        });
+
+        // --- CHANNEL MANAGEMENT ---
+
+        function openChannelManager() {
+            socket.emit('get_channels', (channels) => {
+                allChannels = channels;
+                renderChannelList();
+
+                // Populate programs dropdown for new channel form
+                socket.emit('get_programs', (progs) => {
+                    allPrograms = progs;
+                    const sel = document.getElementById('new-channel-program');
+                    if (sel) {
+                        sel.innerHTML = '';
+                        progs.forEach(p => {
+                            const opt = document.createElement('option');
+                            opt.value = p.id;
+                            opt.innerText = p.name;
+                            sel.appendChild(opt);
+                        });
+                    }
+                });
+
+                document.getElementById('channel-manager-modal').style.display = 'flex';
+                document.getElementById('add-channel-form').style.display = 'none';
+            });
+        }
+
+        function renderChannelList() {
+            const list = document.getElementById('channel-list-container'); // Changed to channel-list-container
+            list.innerHTML = '';
+            if (allChannels.length === 0) {
+                list.innerHTML = '<div style="color:#666; font-style:italic;">No channels found.</div>';
+                return;
+            }
+
+            allChannels.forEach(ch => {
+                const item = document.createElement('div');
+                item.className = 'channel-list-item';
+                const isDef = ch.is_default ? '<span style="color:#00f3ff; font-size:10px; margin-left:5px;">★ DEFAULT</span>' : '';
+                const defBtn = ch.is_default ? '' : `<button class="icon-btn" onclick="setDefault('${ch.id}')" title="Make Default">☆</button>`;
+
+                item.innerHTML = `
+                   <div style="flex-grow:1;">
+                      <div style="display:flex; align-items:center;">
+                          <strong style="color:#fff;">${ch.name}</strong>
+                          <button class="icon-btn" onclick="copyHostUrl('${ch.id}')" title="Copy Host URL" style="margin-left:8px; opacity:0.6;">
+                             <svg style="width:14px;height:14px" viewBox="0 0 24 24"><path fill="currentColor" d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z" /></svg>
+                          </button>
+                          ${isDef}
+                      </div>
+                      <span style="font-size:10px; color:#666;">${ch.id} (${ch.width}x${ch.height})</span>
+                   </div>
+                   <div style="display:flex; align-items:center; gap:10px;">
+                      ${defBtn}
+                      <button class="icon-btn" onclick="deleteChannel('${ch.id}')" title="Delete">🗑️</button>
+                   </div>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        function copyHostUrl(id) {
+            const event = window.event;
+            const url = window.location.origin + '/host.html?target=' + id;
+
+            // Modern Clipboard API
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(url).then(() => {
+                    const btn = event ? event.currentTarget : null;
+                    if (btn) {
+                        const oldContent = btn.innerHTML;
+                        btn.innerHTML = '<span style="color:#00f3ff; font-size:10px;">COPIED!</span>';
+                        setTimeout(() => btn.innerHTML = oldContent, 1000);
+                    }
+                }).catch(err => {
+                    // Fallback to prompt
+                    window.prompt("Copy URL:", url);
+                });
+            } else {
+                // Manual Fallback for older browsers
+                window.prompt("Copy URL:", url);
+            }
+        }
+
+        function setDefault(id) {
+            socket.emit('set_default_channel', id, (res) => {
+                if (res.error) alert(res.error);
+                else {
+                    socket.emit('get_channels', (channels) => {
+                        allChannels = channels;
+                        renderChannelList();
+                    });
+                }
+            });
+        }
+
+        function toggleAddChannelForm() {
+            const form = document.getElementById('add-channel-form');
+            form.style.display = form.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function submitCreateChannel() {
+            const id = document.getElementById('new-channel-id').value;
+            const name = document.getElementById('new-channel-name').value;
+            const preset = document.getElementById('new-channel-preset').value;
+            const progId = document.getElementById('new-channel-program').value;
+
+            if (!id || !name) return alert("ID and Name required");
+
+            let w = 720, h = 1280, type = 'vertical';
+            if (preset === 'l720') { w = 1280; h = 720; type = 'landscape'; }
+            if (preset === 'v1080') { w = 1080; h = 1920; type = 'vertical'; }
+            if (preset === 'l1080') { w = 1920; h = 1080; type = 'landscape'; }
+
+            socket.emit('create_channel', { id, name, width: w, height: h, type, program_id: progId }, (res) => {
+                if (res.error) alert(res.error);
+                else {
+                    // refresh list
+                    socket.emit('get_channels', (channels) => {
+                        allChannels = channels;
+                        renderChannelList();
+                        toggleAddChannelForm();
+                        // Auto open tab for new channel
+                        if (!openTabs.includes(id)) {
+                            openTabs.push(id);
+                            renderTabs();
+                            setTarget(id);
+                        }
+                    });
+                }
+            });
+        }
+
+        function deleteChannel(id) {
+            if (!confirm("Delete channel " + id + "?")) return;
+            socket.emit('delete_channel', id, (res) => {
+                if (res.error) alert(res.error);
+                else {
+                    socket.emit('get_channels', (channels) => {
+                        allChannels = channels;
+                        renderChannelList();
+                        // Close tab if open
+                        if (openTabs.includes(id)) {
+                            openTabs = openTabs.filter(t => t !== id);
+                            if (currentTarget === id) currentTarget = null;
+                            renderTabs();
+                            if (openTabs.length > 0) setTarget(openTabs[0]);
+                            else setTarget(null); // Clear view
+                        }
+                    });
+                }
+            });
+        }
+
+        // --- TABS & SWITCHING ---
+
+        function openChannelSwitcher() {
+            socket.emit('get_channels', (channels) => {
+                allChannels = channels;
+                // Filter out already open tabs
+                const avail = channels.filter(c => !openTabs.includes(c.id));
+                const sel = document.getElementById('switcher-select');
+                sel.innerHTML = '';
+                avail.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.id;
+                    opt.innerText = c.name;
+                    sel.appendChild(opt);
+                });
+
+                const btn = document.querySelector('#channel-switcher-modal .btn-confirm');
+
+                if (avail.length === 0) {
+                    const opt = document.createElement('option');
+                    opt.innerText = "All channels already open";
+                    opt.value = "";
+                    sel.appendChild(opt);
+                    sel.disabled = true;
+                    if (btn) btn.disabled = true;
+                } else {
+                    sel.disabled = false;
+                    if (btn) btn.disabled = false;
+                }
+
+                document.getElementById('channel-switcher-modal').style.display = 'flex';
+            });
+        }
+
+        function confirmOpenTab() {
+            const val = document.getElementById('switcher-select').value;
+            if (val) {
+                if (!openTabs.includes(val)) {
+                    openTabs.push(val);
+                    renderTabs();
+                    setTarget(val);
+                }
+                closeModal('channel-switcher-modal');
+            }
+        }
+
+        function renderTabs() {
+            // Save state
+            localStorage.setItem('hangar_open_tabs', JSON.stringify(openTabs));
+
+            const container = document.getElementById('channel-tabs');
+            container.innerHTML = '';
+
+            openTabs.forEach(tid => {
+                const ch = allChannels.find(c => c.id === tid);
+                const name = ch ? ch.name : tid;
+
+                const tab = document.createElement('div');
+                tab.className = `chrome-tab ${tid === currentTarget ? 'active' : ''}`;
+                tab.onclick = (e) => {
+                    if (e.target.classList.contains('chrome-tab-close')) return;
+                    setTarget(tid);
+                };
+                tab.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:5px;">
+                        <span>${name}</span>
+                    </div>
+                    <span class="chrome-tab-close" onclick="closeTab('${tid}')">×</span>
+                 `;
+                container.appendChild(tab);
+            });
+        }
+
+        function closeTab(id) {
+            openTabs = openTabs.filter(t => t !== id);
+            if (currentTarget === id) {
+                currentTarget = openTabs.length > 0 ? openTabs[openTabs.length - 1] : null;
+                setTarget(currentTarget); // will re-render tabs via update
+            } else {
+                renderTabs();
+            }
+        }
+
+        function setTarget(target) {
+            if (!target) {
+                // Clear state
+                currentTarget = null;
+                localStorage.removeItem('hangar_active_target');
+                document.getElementById('canvas-label').innerText = "No Channel Selected";
+                selectLayer(null);
+                currentScene = null;
+                renderEverything();
+                renderTabs();
+                return;
+            }
+
+            currentTarget = target;
+            localStorage.setItem('hangar_active_target', target);
+
+            // Load Individual Zoom
+            canvasZoom = canvasZooms[target] || 1.0;
+            updateCanvasTransform();
+
+            // Re-fetch channel details to update Canvas size if needed
+            const ch = allChannels.find(c => c.id === target);
+            if (ch) {
+                const canvas = document.getElementById('virtual-canvas');
+                const label = document.getElementById('canvas-label');
+
+                // Update Canvas Aspect Ratio visual
+                const ratio = ch.height / ch.width;
+                const newH = 360 * ratio;
+
+                canvas.style.height = newH + 'px';
+                canvas.style.width = '360px'; // Keep fixed width for UI consistency
+
+                label.innerText = `${ch.name} (${ch.width}x${ch.height})`;
+
+                renderTabs();
+                renderProgramControls(ch);
+
+                // IMPORTANT: Re-register to join the channel room and get the latest scene
+                socket.emit('register', { role: 'admin', target: target });
+
+                // Deselect any active layer when switching channels
+                selectLayer(null);
+            }
+        }
+
+        async function renderProgramControls(channel) {
+            const panel = document.getElementById('program-controls-panel');
+            const list = document.getElementById('program-triggers-list');
+            const title = document.getElementById('program-controls-title');
+
+            if (!channel.program_id) {
+                panel.style.display = 'none';
+                return;
+            }
+
+            // Fetch programs to get the latest trigger definitions
+            socket.emit('get_programs', (progs) => {
+                const prog = progs.find(p => p.id === channel.program_id);
+                if (!prog || !prog.triggers) {
+                    panel.style.display = 'none';
+                    return;
+                }
+
+                panel.style.display = 'block';
+                title.innerText = `CONTROLS: ${prog.name}`;
+                list.innerHTML = '';
+
+                // Get current channel state
+                socket.emit('get_channel_state', channel.id, (state) => {
+                    prog.triggers.forEach(trig => {
+                        const btn = document.createElement('button');
+                        btn.className = 'btn';
+                        btn.style.width = '100%';
+                        btn.style.textAlign = 'left';
+                        btn.style.display = 'flex';
+                        btn.style.justifyContent = 'space-between';
+                        btn.style.alignItems = 'center';
+                        btn.style.marginBottom = '5px';
+
+                        const isActive = !!state[trig.id];
+                        if (isActive && trig.action !== 'trigger') {
+                            btn.classList.add('btn-confirm');
+                            btn.style.borderColor = '#00f3ff';
+                        }
+
+                        const typeIcon = trig.action === 'trigger' ? '⚡' : '🔘';
+                        btn.innerHTML = `<span>${typeIcon} ${trig.name}</span> <span style="font-size:9px; opacity:0.3;">${trig.id}</span>`;
+
+                        btn.onclick = (e) => {
+                            if (trig.action === 'trigger') {
+                                // Transient Trigger
+                                let payload = null;
+                                // Heuristic for alert payloads
+                                if (trig.id === 'alert' || trig.id === 'system_alert') {
+                                    const msg = prompt("Alert Message:", "SYSTEM ALERT ACTIVE");
+                                    if (msg) payload = { message: msg };
+                                    else return; // Cancelled
+                                }
+                                socket.emit('fire_trigger', { channelId: channel.id, key: trig.id, payload: payload });
+
+                                // Visual feedback for transient
+                                btn.classList.add('btn-confirm');
+                                setTimeout(() => btn.classList.remove('btn-confirm'), 500);
+                            } else {
+                                // Persistent State
+                                const newState = !isActive;
+                                socket.emit('set_channel_state', { channelId: channel.id, key: trig.id, value: newState });
+                                // Local update for instant feel
+                                state[trig.id] = newState;
+                                renderProgramControls(channel);
+                            }
+                        };
+                        list.appendChild(btn);
+                    });
+                });
+            });
+        }
+
+        // Initial Load
+        socket.emit('get_channels', (channels) => {
+            allChannels = channels;
+
+            // 1. Try LocalStorage for Tabs
+            const stored = localStorage.getItem('hangar_open_tabs');
+            if (stored) {
+                try {
+                    openTabs = JSON.parse(stored);
+                    // Filter out invalid/deleted channels
+                    openTabs = openTabs.filter(tid => allChannels.some(c => c.id === tid));
+                } catch (e) { console.error(e); openTabs = []; }
+            }
+
+            // 2. Load Zooms
+            const storedZooms = localStorage.getItem('hangar_canvas_zooms');
+            if (storedZooms) {
+                try { canvasZooms = JSON.parse(storedZooms); } catch (e) { console.error(e); }
+            }
+
+            // 3. If Empty, use Default
+            if (openTabs.length === 0) {
+                const def = allChannels.find(c => c.is_default);
+                if (def) openTabs.push(def.id);
+                // Legacy Fallback
+                else if (allChannels.some(c => c.id === 'vertical')) openTabs.push('vertical');
+                else if (allChannels.some(c => c.id === 'landscape')) openTabs.push('landscape');
+
+                // Final Fallback
+                if (openTabs.length === 0 && allChannels.length > 0) {
+                    openTabs.push(allChannels[0].id);
+                }
+            }
+
+            // 4. Restore Active Target
+            const lastTarget = localStorage.getItem('hangar_active_target');
+            if (lastTarget && openTabs.includes(lastTarget)) {
+                setTarget(lastTarget);
+            } else if (openTabs.length > 0) {
+                setTarget(openTabs[0]);
+            }
+            renderTabs();
+        });
+
+        // Listen for updates from other admins
+        socket.on('channels_updated', () => {
+            socket.emit('get_channels', (channels) => {
+                allChannels = channels;
+                renderTabs(); // Update names if changed
+                renderChannelList(); // If modal open
+            });
+        });
+
+        // --- END CHANNEL MANAGEMENT ---
+
+        // State
+        let currentScene = null;
+        let selectedLayerId = null;
+        let isDragging = false;
+        let dragStart = { x: 0, y: 0 };
+        let initialPos = { x: 0, y: 0 };
+
+        const canvas = document.getElementById('virtual-canvas');
+        const container = document.getElementById('layer-container');
+        const listEl = document.getElementById('layer-list');
+        const gizmo = document.getElementById('selection-gizmo');
+        const inputs = {
+            x: document.getElementById('inp-x'),
+            y: document.getElementById('inp-y'),
+            w: document.getElementById('inp-w'),
+            h: document.getElementById('inp-h'),
+            r: document.getElementById('inp-r'),
+            opacity: document.getElementById('inp-opacity'),
+            opacityLabel: document.getElementById('val-opacity'),
+            volume: document.getElementById('inp-volume'),
+            volumeLabel: document.getElementById('val-volume'),
+            id: document.getElementById('sel-id'),
+            type: document.getElementById('sel-type')
+        };
+        socket.on('scene_update', (scene) => {
+            currentScene = scene;
+            renderEverything();
+        });
+
+        function renderEverything() {
+            if (!currentScene) return;
+            document.getElementById('source-count').innerText = currentScene.layers.length;
+
+            const listEl = document.getElementById('layer-list');
+            listEl.innerHTML = '';
+
+            // Helper for items
+            const createItem = (layer) => {
+                const item = document.createElement('div');
+                item.className = `layer-item ${layer.id === selectedLayerId ? 'selected' : ''}`;
+
+                const typeIcon = layer.type.includes('audio') ? '🎤' : (layer.type === 'web_source' ? '🌐' : (layer.type === 'text_source' ? '📝' : (layer.type === 'image_source' ? '🖼️' : '📷')));
+                const isMuted = layer.muted === true;
+                const muteIcon = isMuted ? '🔇' : '🔊';
+
+                // Visibility Logic
+                const isVisible = layer.visible !== false; // Default true
+                const visIcon = isVisible ? '👁️' : '🚫';
+                const itemClass = isVisible ? '' : 'opacity: 0.5;';
+
+                const isLocked = layer.locked === true;
+                const lockIcon = isLocked ? '🔒' : '🔓';
+
+                item.innerHTML = `
+                    <div class="layer-left" style="${itemClass}">
+                        <span class="layer-icon">${typeIcon}</span> 
+                        <span>${layer.id}</span>
+                        <span style="font-size:9px; color:#555; margin-left:5px;">${layer.source_id || ''}</span>
+                    </div>
+                    <div class="layer-actions">
+                        <button class="icon-btn" onclick="toggleLock('${layer.id}', ${!isLocked})" title="Lock/Unlock (Click-through)">${lockIcon}</button>
+                        <button class="icon-btn" onclick="toggleVisibility('${layer.id}', ${!isVisible})" title="Show/Hide">${visIcon}</button>
+                        <button class="icon-btn" onclick="openEditModal('${layer.id}')" title="Settings">⚙️</button>
+                        <button class="icon-btn" onclick="toggleMute('${layer.id}', ${!isMuted})" title="Mute/Unmute">${muteIcon}</button>
+                        <button class="icon-btn" onclick="confirmDelete('${layer.id}')" title="Delete">🗑️</button>
+                    </div>
+                `;
+                item.onclick = (e) => {
+                    if (e.target.tagName !== 'BUTTON') selectLayer(layer.id);
+                };
+                item.ondblclick = () => openEditModal(layer.id);
+                return item;
+            };
+
+            // 1. Visual Layers
+            const visualLayers = currentScene.layers
+                .filter(l => !l.type.includes('audio'))
+                .sort((a, b) => b.z_index - a.z_index);
+
+            if (visualLayers.length > 0) {
+                const head = document.createElement('div');
+                head.className = 'panel-header';
+                head.innerText = 'VISUAL LAYERS';
+                head.style.background = '#1a1a1a';
+                listEl.appendChild(head);
+                visualLayers.forEach(l => listEl.appendChild(createItem(l)));
+            }
+
+            // 2. Audio Sources (Mic + Cameras with Audio)
+            const audioLayers = currentScene.layers
+                .filter(l => l.type.includes('audio') || l.type.includes('webrtc_video'));
+
+            if (audioLayers.length > 0) {
+                const head = document.createElement('div');
+                head.className = 'panel-header';
+                head.innerText = 'AUDIO SOURCES';
+                head.style.background = '#1a1a1a';
+                head.style.borderTop = '1px solid #000';
+                listEl.appendChild(head);
+                audioLayers.forEach(l => {
+                    // Visual distinction for hybrid sources
+                    let item = createItem(l);
+                    if (l.type === 'webrtc_video') {
+                        item.querySelector('.layer-icon').innerText = '📹+🎤';
+                        item.querySelector('.layer-actions').style.borderLeft = "2px solid #00f3ff";
+                    }
+                    listEl.appendChild(item);
+                });
+            }
+
+            // Sync with visual container
+            container.innerHTML = '';
+            currentScene.layers.sort((a, b) => a.z_index - b.z_index).forEach(layer => {
+                if (layer.type.includes('audio')) return;
+
+                const el = document.createElement('div');
+                el.id = `layer-${layer.id}`;
+                el.className = `proxy-layer ${layer.visible === false ? 'hidden' : ''} ${layer.locked ? 'locked' : ''}`;
+                el.style.left = layer.position.x + '%';
+                el.style.top = layer.position.y + '%';
+                el.style.width = layer.position.width + '%';
+                el.style.height = layer.position.height + '%';
+                el.style.zIndex = layer.z_index;
+                el.style.transform = `rotate(${layer.rotation || 0}deg)`;
+                el.style.opacity = layer.opacity !== undefined ? layer.opacity : 1;
+
+                el.innerHTML = `<div class="proxy-label">${layer.id}</div>`;
+
+                // AUTHORITY OF PANEL: Locked layers are transparent to clicks
+                el.style.pointerEvents = (layer.locked) ? 'none' : 'auto';
+
+                el.onclick = (e) => {
+                    e.stopPropagation();
+                    selectLayer(layer.id);
+                };
+
+                container.appendChild(el);
+            });
+
+            // Sync Moveable Target
+            if (selectedLayerId) {
+                const targetEl = document.getElementById(`layer-${selectedLayerId}`);
+                if (targetEl) moveable.target = targetEl;
+                else moveable.target = null;
+            } else {
+                moveable.target = null;
+            }
+        }
+
+        // --- SANITIZATION ---
+        function sanitizeInput(e) {
+            const val = e.target.value;
+            // Remove spaces, only alphanumeric and brackets/underscores
+            const safe = val.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_\-\[\]]/g, '');
+            if (val !== safe) e.target.value = safe;
+        }
+
+        document.getElementById('add-id').addEventListener('input', sanitizeInput);
+        document.getElementById('add-src-id').addEventListener('input', sanitizeInput);
+        document.getElementById('edit-val').addEventListener('input', (e) => {
+            // Only sanitize if it's NOT a URL (simple heuristic check on parent modal context or just allow generic safe chars for IDs)
+            // But edit-val handles URLs too. Let's skip strict sanitization for edit-val generic, 
+            // OR check the layer type. 
+            // Better: just sanitize spaces to underscores for now, valid in URLs usually. 
+            if (!e.target.value.includes('/')) sanitizeInput(e);
+        });
+
+        function selectLayer(id) {
+            selectedLayerId = id;
+            const layer = currentScene.layers.find(l => l.id === id);
+
+            if (layer) {
+                // Audio-only check: type has 'audio' but NOT 'video' (to exclude webrtc_video which has audio but is visual)
+                // Actually 'webrtc_video' does NOT have 'audio' in type string. 'webrtc_audio' DOES.
+                // So checking .includes('audio') is safe for 'webrtc_audio'.
+                const isAudioOnly = layer.type.includes('audio');
+
+                inputs.x.value = layer.position.x;
+                inputs.y.value = layer.position.y;
+                inputs.w.value = layer.position.width;
+                inputs.h.value = layer.position.height;
+                inputs.r.value = layer.rotation || 0;
+                inputs.opacity.value = layer.opacity !== undefined ? layer.opacity : 1;
+                inputs.opacityLabel.innerText = inputs.opacity.value;
+                inputs.volume.value = layer.volume !== undefined ? layer.volume : 1;
+                inputs.volumeLabel.innerText = inputs.volume.value;
+
+                inputs.id.innerText = layer.id;
+                inputs.type.innerText = layer.type;
+                inputs.opacity.disabled = false;
+                inputs.opacity.style.opacity = '1';
+                inputs.volume.disabled = false;
+                inputs.volume.style.opacity = '1';
+
+                // Disable/Lock logic
+                [inputs.x, inputs.y, inputs.w, inputs.h, inputs.r].forEach(inp => {
+                    if (!inp) return;
+                    inp.disabled = isAudioOnly;
+                    inp.style.opacity = isAudioOnly ? '0.3' : '1';
+                    inp.parentElement.style.opacity = isAudioOnly ? '0.5' : '1';
+                });
+
+            } else {
+                selectedLayerId = null;
+                inputs.id.innerText = "None";
+                inputs.type.innerText = "";
+
+                // Reset
+                [inputs.x, inputs.y, inputs.w, inputs.h, inputs.r, inputs.opacity, inputs.volume].forEach(inp => {
+                    if (!inp) return;
+                    inp.disabled = false;
+                    inp.style.opacity = '1';
+                    if (inp.parentElement && inp.parentElement.style) inp.parentElement.style.opacity = '1';
+                    inp.value = inp.type === 'range' ? 1 : '';
+                });
+                inputs.opacityLabel.innerText = "1.0";
+                inputs.volumeLabel.innerText = "1.0";
+            }
+            renderEverything();
+        }
+
+        // --- Moveable Integration ---
+        moveable = new Moveable(document.getElementById('virtual-canvas'), {
+            target: null,
+            draggable: true,
+            resizable: true,
+            rotatable: true,
+            snappable: true,
+            snapThreshold: 5,
+            throttleDrag: 0,
+            throttleResize: 0,
+            throttleRotate: 0,
+            keepRatio: false,
+            origin: true,
+            zoom: 1 / canvasZoom, // Init with current zoom
+        });
+
+        // 1. DRAG
+        moveable.on('dragStart', () => {
+            pushHistory();
+        }).on('drag', ({ target, left, top }) => {
+            target.style.left = left + 'px';
+            target.style.top = top + 'px';
+        }).on('dragEnd', ({ target }) => {
+            syncFromDOM(target);
+        });
+
+        // 2. RESIZE
+        moveable.on('resizeStart', () => {
+            pushHistory();
+        }).on('resize', ({ target, width, height, drag }) => {
+            target.style.width = width + 'px';
+            target.style.height = height + 'px';
+            target.style.transform = drag.transform;
+        }).on('resizeEnd', ({ target }) => {
+            syncFromDOM(target);
+        });
+
+        // 3. ROTATE
+        moveable.on('rotateStart', () => {
+            pushHistory();
+        }).on('rotate', ({ target, transform }) => {
+            target.style.transform = transform;
+        }).on('rotateEnd', ({ target }) => {
+            syncFromDOM(target);
+        });
+
+        function syncFromDOM(el) {
+            const parent = el.offsetParent;
+            if (!parent) return;
+            const pRect = parent.getBoundingClientRect();
+
+            // Clean transform matrix to Rotation only?
+            // If resize introduced translate in transform, we need to apply that to Left/Top and clear transform's translate?
+            // This is complex math.
+            // Simplification: Parse what we see.
+            // But if 'transform' has translate, 'style.left' is old.
+            // We need to bake translate into Left/Top.
+            // Basic version:
+
+            // Use unscaled parent dimensions for correct percentage calculation
+            const pWidth = parent.offsetWidth;
+            const pHeight = parent.offsetHeight;
+
+            const x = (el.offsetLeft / pWidth) * 100;
+            const y = (el.offsetTop / pHeight) * 100;
+            const w = (el.offsetWidth / pWidth) * 100;
+            const h = (el.offsetHeight / pHeight) * 100;
+
+            // Extract rotation from transform
+            // Note: el.style.transform might contain translate() and rotate().
+            // We want to save 'rotation' property.
+            // If translate is present, we must convert it to x/y, but el.offsetLeft handles layout pos? 
+            // offsetLeft does NOT include transform translation.
+            // So if Resize added translate, offsetLeft is wrong (static).
+            // We must parse the transform matrix.
+
+            // MVP: Just support Drag (x/y) and Rotate (r). 
+            // Resize (w/h) works well if not changing position (bottom-right handle).
+            // If user resizes top-left, it relies on transform-translate.
+            // Let's hope users resize bottom-right mostly or accept the jump.
+
+            let r = 0;
+            const match = el.style.transform.match(/rotate\((-?\d+\.?\d*)deg\)/);
+            if (match) r = parseFloat(match[1]);
+
+            const opacity = parseFloat(inputs.opacity.value);
+            const volume = parseFloat(inputs.volume.value);
+
+            updateLayerPosition(x, y, w, h, r, opacity, volume);
+        }
+
+        function updateGizmo() {
+            if (!selectedLayerId || !currentScene) {
+                moveable.target = null;
+                return;
+            }
+            const layer = currentScene.layers.find(l => l.id === selectedLayerId);
+            // Audio filter
+            if (!layer || (layer.type.includes('audio') && layer.type !== 'webrtc_video')) {
+                moveable.target = null;
+                return;
+            }
+
+            // Find proxy
+            const el = document.getElementById('layer-' + selectedLayerId); // Changed to layer-
+            if (el) {
+                // Ensure moveable picks up the new element
+                // We might need to wait for layout? No, sync.
+                moveable.target = el;
+                moveable.updateRect();
+            } else {
+                moveable.target = null;
+            }
+        }
+
+        function updateLayerPosition(x, y, w, h, r, opacity, volume) {
+            const updates = {
+                position: { x: parseFloat(x), y: parseFloat(y), width: parseFloat(w), height: parseFloat(h) }
+            };
+            if (r !== undefined && !isNaN(parseFloat(r))) updates.rotation = parseFloat(r);
+            if (opacity !== undefined && !isNaN(parseFloat(opacity))) {
+                updates.opacity = parseFloat(opacity);
+                inputs.opacityLabel.innerText = updates.opacity.toFixed(2);
+            }
+            if (volume !== undefined && !isNaN(parseFloat(volume))) {
+                updates.volume = parseFloat(volume);
+                inputs.volumeLabel.innerText = updates.volume.toFixed(2);
+            }
+
+            socket.emit('update_layer', {
+                layerId: selectedLayerId,
+                props: updates,
+                target: currentTarget
+            });
+        }
+
+        // --- Z-Index Management ---
+        function rebalanceZIndices(sortedLayers) {
+            // Assign clean stepped indices (10, 20, 30...)
+            sortedLayers.forEach((layer, index) => {
+                const newZ = (index + 1) * 10;
+                if (layer.z_index !== newZ) {
+                    // Optimistic update
+                    layer.z_index = newZ;
+                    socket.emit('update_layer', { layerId: layer.id, props: { z_index: newZ } });
+                }
+            });
+        }
+
+        window.changeZIndex = (delta) => {
+            if (!selectedLayerId || !currentScene) return;
+            pushHistory();
+            // 1. Get visual layers sorted by Z (Ascending: 0=Bottom, N=Top)
+            let layers = currentScene.layers
+                .filter(l => !l.type.includes('audio')) // Only reorder visual stuff
+                .sort((a, b) => (a.z_index || 0) - (b.z_index || 0));
+
+            const curIndex = layers.findIndex(l => l.id === selectedLayerId);
+            if (curIndex === -1) return;
+
+            // 2. Determine swap target
+            const targetIndex = curIndex + delta; // +1 = Up (Higher Z), -1 = Down (Lower Z)
+
+            // Bounds check
+            if (targetIndex < 0 || targetIndex >= layers.length) return;
+
+            // 3. Swap in local array
+            const temp = layers[curIndex];
+            layers[curIndex] = layers[targetIndex];
+            layers[targetIndex] = temp;
+
+            // 4. Re-assign clean IDs to everyone
+            rebalanceZIndices(layers);
+        };
+
+        // --- Layer Management ---
+        window.toggleMute = (id, muteState) => {
+            pushHistory();
+            socket.emit('update_layer', { layerId: id, props: { muted: muteState } });
+        };
+
+        window.toggleVisibility = (id, visState) => {
+            pushHistory();
+            socket.emit('update_layer', { layerId: id, props: { visible: visState } });
+        };
+
+        window.toggleLock = (id, lockState) => {
+            pushHistory();
+            socket.emit('update_layer', { layerId: id, props: { locked: lockState }, target: currentTarget });
+            // Local update for instant feel
+            if (currentScene) {
+                const layer = currentScene.layers.find(l => l.id === id);
+                if (layer) layer.locked = lockState;
+                renderEverything();
+            }
+        };
+
+        window.confirmDelete = (id) => {
+            if (confirm('Delete layer ' + id + '?')) {
+                pushHistory();
+                socket.emit('remove_layer', {
+                    layerId: id,
+                    target: currentTarget
+                });
+                if (selectedLayerId === id) selectLayer(null);
+            }
+        };
+
+        // --- Modals ---
+        window.openAddModal = () => {
+            document.getElementById('add-modal').style.display = 'flex';
+            updateAddForm();
+        };
+        window.closeModal = (id) => document.getElementById(id).style.display = 'none';
+
+        // Global cache of available devices
+        let availableDevices = [];
+
+        window.updateAddForm = async () => {
+            const type = document.getElementById('add-type').value;
+
+            // Toggle Fields
+            document.getElementById('field-device-select').style.display = (type === 'device_video') ? 'block' : 'none';
+            document.getElementById('field-source-id').style.display = (type === 'webrtc_audio' || type === 'local_video') ? 'block' : 'none';
+            document.getElementById('field-url').style.display = (type === 'web_source') ? 'block' : 'none';
+            document.getElementById('field-text').style.display = (type === 'text_source') ? 'block' : 'none';
+            document.getElementById('field-image-url').style.display = (type === 'image_source') ? 'block' : 'none';
+
+            // Load Devices if needed
+            if (type === 'device_video') {
+                const sel = document.getElementById('add-device-select');
+                sel.innerHTML = '<option value="">Loading...</option>';
+                try {
+                    const res = await fetch('/api/devices');
+                    availableDevices = await res.json();
+
+                    sel.innerHTML = '';
+                    if (availableDevices.length === 0) {
+                        sel.innerHTML = '<option value="">No devices found</option>';
+                        return;
+                    }
+
+                    availableDevices.forEach(dev => {
+                        const opt = document.createElement('option');
+                        opt.value = dev.source_id; // Value is the stream ID
+                        opt.innerText = `${dev.name} (${dev.type})`;
+                        // Store full type in data attribute if needed, simplified here
+                        // We will look it up on submit
+                        sel.appendChild(opt);
+                    });
+                } catch (e) {
+                    sel.innerHTML = '<option value="">Error loading devices</option>';
+                }
+            }
+        };
+
+        window.submitAddSource = () => {
+            const id = document.getElementById('add-id').value;
+            const formType = document.getElementById('add-type').value; // 'device_video' | 'web_source' ...
+            if (!id) return alert("Name required");
+
+            let finalType = formType;
+            let finalSourceId = '';
+            let finalRtsp = '';
+
+            // Map UI type to Backend/Layer Type
+            if (formType === 'device_video') {
+                const selectedSourceId = document.getElementById('add-device-select').value;
+                if (!selectedSourceId) return alert("Please select a device");
+
+                const dev = availableDevices.find(d => d.source_id === selectedSourceId);
+                if (dev) {
+                    finalType = dev.type; // e.g. 'onvif_video' or 'srt_video'
+                    finalSourceId = dev.source_id;
+                    finalRtsp = dev.url; // Persist if needed (for ONVIF)
+                } else {
+                    return alert("Device not found");
+                }
+            } else if (formType === 'webrtc_audio' || formType === 'local_video') {
+                finalSourceId = document.getElementById('add-src-id').value;
+            }
+
+            const newLayer = {
+                id: id,
+                type: finalType,
+                z_index: currentScene.layers.length + 10,
+                position: { x: 10, y: 10, width: 50, height: 30 },
+                muted: false
+            };
+
+            if (formType === 'web_source') {
+                newLayer.url = document.getElementById('add-url').value;
+            } else if (formType === 'image_source') {
+                newLayer.url = document.getElementById('add-image-url').value;
+            } else if (formType === 'text_source') {
+                newLayer.content = document.getElementById('add-text').value;
+            } else {
+                newLayer.source_id = finalSourceId;
+                if (finalRtsp) newLayer.rtsp_url = finalRtsp;
+            }
+
+            pushHistory();
+            socket.emit('add_layer', {
+                newLayer: newLayer,
+                target: currentTarget
+            });
+            closeModal('add-modal');
+        };
+
+        window.openEditModal = (id) => {
+            const layer = currentScene.layers.find(l => l.id === id);
+            if (!layer) return;
+
+            document.getElementById('edit-modal').style.display = 'flex';
+            document.getElementById('edit-id-hidden').value = id;
+
+            const inp = document.getElementById('edit-val');
+            const prefField = document.getElementById('field-pref');
+            const resField = document.getElementById('field-res');
+            const prefSel = document.getElementById('edit-pref');
+            const resSel = document.getElementById('edit-res');
+
+            // Reset UI
+            prefSel.innerHTML = '<option value="">Searching...</option>';
+            prefSel.value = "";
+            resSel.value = layer.camera_quality || ""; // Load saved Quality
+
+            const valLabel = document.querySelector('#edit-modal label[for="edit-val"]') || document.querySelector('#edit-modal label');
+
+            if (layer.type === 'web_source') {
+                valLabel.innerText = "OVERLAY URL";
+                inp.value = layer.url;
+                prefField.style.display = 'none';
+                resField.style.display = 'none';
+                document.getElementById('field-edit-rtsp').style.display = 'none';
+            } else if (layer.type === 'onvif_video') {
+                valLabel.innerText = "STREAM NAME (ID)";
+                inp.value = layer.source_id || '';
+                document.getElementById('edit-rtsp-val').value = layer.rtsp_url || '';
+                document.getElementById('field-edit-rtsp').style.display = 'block';
+                prefField.style.display = 'none';
+                resField.style.display = 'none';
+            } else if (layer.type === 'text_source') {
+                valLabel.innerText = "STATIC TEXT";
+                inp.value = layer.content || '';
+                document.getElementById('field-edit-rtsp').style.display = 'none';
+                prefField.style.display = 'none';
+                resField.style.display = 'none';
+            } else if (layer.type === 'image_source') {
+                valLabel.innerText = "IMAGE URL";
+                inp.value = layer.url || '';
+                document.getElementById('field-edit-rtsp').style.display = 'none';
+                prefField.style.display = 'none';
+                resField.style.display = 'none';
+            } else {
+                valLabel.innerText = "STREAM ID";
+                inp.value = layer.source_id || '';
+                document.getElementById('field-edit-rtsp').style.display = 'none';
+                if (layer.type === 'webrtc_video') {
+                    prefField.style.display = 'none'; // Disabled
+                    resField.style.display = 'block';
+
+                    // Clear pref selector
+                    prefSel.innerHTML = '<option value="">Lens Control Disabled</option>';
+                } else {
+                    prefField.style.display = 'none';
+                    resField.style.display = 'none';
+                }
+            }
+        };
+
+        window.submitEditSource = () => {
+            const id = document.getElementById('edit-id-hidden').value;
+            const val = document.getElementById('edit-val').value;
+            const pref = document.getElementById('edit-pref').value;
+            const qual = document.getElementById('edit-res').value;
+            const layer = currentScene.layers.find(l => l.id === id);
+
+            let props = {};
+            if (layer.type === 'web_source') props.url = val;
+            else if (layer.type === 'image_source') props.url = val;
+            else if (layer.type === 'text_source') props.content = val;
+            else if (layer.type === 'onvif_video') {
+                props.source_id = val;
+                props.rtsp_url = document.getElementById('edit-rtsp-val').value;
+            }
+            else props.source_id = val;
+
+            // Save persistent settings
+            if (layer.type === 'webrtc_video') {
+                if (pref) props.camera_pref = pref;
+                if (qual) props.camera_quality = qual;
+            }
+
+            pushHistory();
+            socket.emit('update_layer', {
+                layerId: id,
+                props,
+                target: currentTarget
+            });
+
+            // Send command if preference/res set via generic control_command
+            if (layer.type === 'webrtc_video' && layer.source_id) {
+                if (pref) socket.emit('control_command', { target: layer.source_id, action: 'set_pref', value: pref });
+                if (qual) socket.emit('control_command', { target: layer.source_id, action: 'set_quality', value: qual });
+            }
+
+            closeModal('edit-modal');
+        };
+
+        // Input listeners
+        [inputs.x, inputs.y, inputs.w, inputs.h, inputs.r, inputs.opacity, inputs.volume].forEach(inp => {
+            if (!inp) return;
+            // Capture history ONCE when user starts interacting
+            inp.onmousedown = () => pushHistory();
+            inp.onkeydown = (e) => {
+                // If they use arrows, capture before it changes
+                if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) pushHistory();
+            };
+
+            inp.oninput = () => { // Use oninput for real-time slider feel
+                if (!selectedLayerId) return;
+                updateLayerPosition(inputs.x.value, inputs.y.value, inputs.w.value, inputs.h.value, inputs.r.value, inputs.opacity.value, inputs.volume.value);
+            };
+        });
+
+        function saveCurrentScene() {
+            if (!currentTarget) return alert("Please select a channel first");
+            socket.emit('save_scene', {
+                layout: currentScene,
+                target: currentTarget
+            });
+            alert("Scene configuration saved definitively for " + currentTarget.toUpperCase());
+        }
+
+    </script>
+</body>
+
+</html>

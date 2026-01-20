@@ -1,0 +1,105 @@
+{
+  "main": {
+    "id": "main",
+    "name": "Main Output (Production)",
+    "width": 1920,
+    "height": 1080,
+    "type": "landscape",
+    "program_id": "stark_hud",
+    "state": {
+      "idle": false,
+      "warning": false,
+      "critical": true
+    },
+    "active_scene": "default",
+    "scenes": {
+      "default": {
+        "layers": [
+          {
+            "id": "Texto",
+            "type": "text_source",
+            "z_index": 11,
+            "position": {
+              "x": 7.734806629834254,
+              "y": 18.536585365853657,
+              "width": 38.39779005524862,
+              "height": 21.463414634146343
+            },
+            "muted": false,
+            "content": "Hangar 89",
+            "rotation": 0,
+            "opacity": 1,
+            "volume": 1,
+            "locked": true
+          },
+          {
+            "id": "hud_main",
+            "type": "web_source",
+            "url": "/stark_hud.html",
+            "z_index": 100,
+            "position": {
+              "x": 0,
+              "y": 0,
+              "width": 100,
+              "height": 100
+            },
+            "opacity": 1,
+            "visible": true,
+            "rotation": 0,
+            "volume": 1,
+            "locked": true
+          }
+        ]
+      }
+    }
+  },
+  "vertical": {
+    "id": "vertical",
+    "name": "Vertical",
+    "width": 720,
+    "height": 1280,
+    "type": "vertical",
+    "program_id": "stark_hud",
+    "state": {
+      "idle": false,
+      "warning": false,
+      "critical": false
+    },
+    "active_scene": "default",
+    "scenes": {
+      "default": {
+        "layers": []
+      }
+    }
+  },
+  "landscape": {
+    "id": "landscape",
+    "name": "Landscape",
+    "width": 1280,
+    "height": 720,
+    "type": "landscape",
+    "program_id": "stark_hud",
+    "state": {},
+    "active_scene": "default",
+    "scenes": {
+      "default": {
+        "layers": []
+      }
+    }
+  },
+  "ejemplooo": {
+    "id": "ejemplooo",
+    "name": "ejemplo",
+    "width": 720,
+    "height": 1280,
+    "type": "vertical",
+    "program_id": "demo",
+    "state": {},
+    "active_scene": "default",
+    "scenes": {
+      "default": {
+        "layers": []
+      }
+    }
+  }
+}

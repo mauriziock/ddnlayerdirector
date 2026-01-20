@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S.H.I.E.L.D. // ACCESS CONTROL</title>
+    <style>
+        :root {
+            --bg-color: #050a10;
+            --panel-bg: #0b121d;
+            --text-color: #a0aab5;
+            --accent-color: #00d9f7;
+            /* Cyan nice */
+            --error-color: #ff3333;
+            --grid-color: rgba(0, 217, 247, 0.05);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            background-image:
+                linear-gradient(var(--grid-color) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+            background-size: 40px 40px;
+            color: var(--text-color);
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .login-container {
+            width: 100%;
+            max-width: 400px;
+            background: var(--panel-bg);
+            border: 1px solid rgba(0, 217, 247, 0.2);
+            box-shadow: 0 0 20px rgba(0, 217, 247, 0.1);
+            padding: 2rem;
+            position: relative;
+            backdrop-filter: blur(5px);
+        }
+
+        .login-container::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: linear-gradient(45deg, transparent 40%, var(--accent-color) 40%, var(--accent-color) 60%, transparent 60%);
+            background-size: 200% 200%;
+            z-index: -1;
+            opacity: 0.1;
+            animation: border-flow 4s ease infinite;
+        }
+
+        @keyframes border-flow {
+            0% {
+                background-position: 0% 50%;
+            }
+
+            50% {
+                background-position: 100% 50%;
+            }
+
+            100% {
+                background-position: 0% 50%;
+            }
+        }
+
+        h1 {
+            text-align: center;
+            color: var(--accent-color);
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            margin-bottom: 2rem;
+            font-size: 1.5rem;
+            text-shadow: 0 0 10px rgba(0, 217, 247, 0.5);
+        }
+
+        .input-group {
+            margin-bottom: 1.5rem;
+            position: relative;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.8rem;
+            color: #5d6d7e;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid #2c3e50;
+            color: white;
+            font-family: inherit;
+            box-sizing: border-box;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            box-shadow: 0 0 8px rgba(0, 217, 247, 0.3);
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background: rgba(0, 217, 247, 0.1);
+            border: 1px solid var(--accent-color);
+            color: var(--accent-color);
+            font-family: inherit;
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: var(--accent-color);
+            color: var(--bg-color);
+            box-shadow: 0 0 15px rgba(0, 217, 247, 0.6);
+        }
+
+        .status {
+            margin-top: 1rem;
+            text-align: center;
+            font-size: 0.8rem;
+            min-height: 1.2em;
+        }
+
+        .status.error {
+            color: var(--error-color);
+        }
+
+        .corner {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            border: 2px solid var(--accent-color);
+            transition: all 0.3s;
+        }
+
+        .tl {
+            top: 0;
+            left: 0;
+            border-right: none;
+            border-bottom: none;
+        }
+
+        .tr {
+            top: 0;
+            right: 0;
+            border-left: none;
+            border-bottom: none;
+        }
+
+        .bl {
+            bottom: 0;
+            left: 0;
+            border-right: none;
+            border-top: none;
+        }
+
+        .br {
+            bottom: 0;
+            right: 0;
+            border-left: none;
+            border-top: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="login-container">
+        <div class="corner tl"></div>
+        <div class="corner tr"></div>
+        <div class="corner bl"></div>
+        <div class="corner br"></div>
+
+        <h1>Identificación</h1>
+
+        <form id="login-form">
+            <div class="input-group">
+                <label for="username">OPERATOR ID</label>
+                <input type="text" id="username" name="username" autofocus autocomplete="off">
+            </div>
+            <div class="input-group">
+                <label for="password">ACCESS CODE</label>
+                <input type="password" id="password" name="password">
+            </div>
+            <div id="message" class="status"></div>
+            <button type="submit">Initialize Link</button>
+        </form>
+    </div>
+
+    <script>
+        const form = document.getElementById('login-form');
+        const msg = document.getElementById('message');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            msg.textContent = 'Authenticating...';
+            msg.className = 'status';
+
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries());
+
+            try {
+                const res = await fetch('/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (res.ok) {
+                    msg.style.color = 'var(--accent-color)';
+                    msg.textContent = 'Access Granted.';
+                    setTimeout(() => window.location.href = '/', 1000);
+                } else {
+                    const errorQuery = await res.text();
+                    msg.textContent = errorQuery || 'Access Denied.';
+                    msg.className = 'status error';
+                }
+            } catch (err) {
+                msg.textContent = 'System Error.';
+                msg.className = 'status error';
+            }
+        });
+    </script>
+</body>
+
+</html>

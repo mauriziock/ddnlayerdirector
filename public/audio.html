@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="es" style="background:#000; color: #00f3ff; font-family: monospace;">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hangar Audio Source</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background: #000;
+        }
+
+        /* ROLE OVERLAY */
+        #role-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .role-btn {
+            background: #222;
+            border: 1px solid #ff0055;
+            color: #fff;
+            padding: 20px;
+            width: 80%;
+            max-width: 400px;
+            margin: 10px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            text-align: left;
+            position: relative;
+        }
+
+        .role-btn:hover {
+            background: #333;
+        }
+
+        .role-id {
+            font-size: 0.8rem;
+            color: #888;
+        }
+
+        .role-icon {
+            position: absolute;
+            right: 20px;
+            top: 20px;
+            font-size: 1.5rem;
+        }
+
+        /* MAIN UI */
+        .vu-meter {
+            width: 80px;
+            height: 300px;
+            background: #111;
+            border: 2px solid #333;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .vu-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 0%;
+            background: linear-gradient(to top, #0f0, #ff0, #f00);
+            transition: height 0.1s ease;
+        }
+
+        .mic-select {
+            padding: 10px;
+            background: #111;
+            color: #fff;
+            border: 1px solid #444;
+            margin-bottom: 20px;
+        }
+
+        .status {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ROLE SELECTION -->
+    <div id="role-overlay">
+        <h2 style="color:#ff0055; margin-bottom:30px;">SELECT AUDIO ROLE</h2>
+        <div id="role-list" style="width:100%; display:flex; flex-direction:column; align-items:center;">
+            <div style="color:#666;">Waiting for Director scenes...</div>
+        </div>
+    </div>
+
+    <!-- MAIN UI -->
+    <div class="vu-meter">
+        <div id="vu-level" class="vu-bar"></div>
+    </div>
+
+    <select id="mic-select" class="mic-select" onchange="startStream(this.value)"></select>
+
+    <div class="status">
+        <span id="role-display" style="color:#aaa;">NO ROLE</span> •
+        <span id="status-text" style="color:red">OFFLINE</span>
+    </div>
+
+    <script>
+        const socket = io();
+
+        let mySourceId = null;
+        let localStream = null;
+        let peerConnection = null;
+        let audioContext, analyser, microphone, javascriptNode;
+
+        const roleList = document.getElementById('role-list');
+        const overlay = document.getElementById('role-overlay');
+        const roleDisplay = document.getElementById('role-display');
+        const statusText = document.getElementById('status-text');
+        const vuLevel = document.getElementById('vu-level');
+        const micSelect = document.getElementById('mic-select');
+
+        const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+        // 1. Initial Logic
+        socket.emit('register', 'source_candidate');
+
+        socket.on('scene_update', (scene) => {
+            if (mySourceId) return;
+
+            const audioSlots = scene.layers.filter(l => l.type.includes('webrtc_audio'));
+            roleList.innerHTML = '';
+
+            if (audioSlots.length === 0) {
+                roleList.innerHTML = '<div style="color:#666;">No audio slots available.</div>';
+                return;
+            }
+
+            audioSlots.forEach(slot => {
+                const btn = document.createElement('button');
+                btn.className = 'role-btn';
+                btn.innerHTML = `
+                    <div>${slot.id}</div>
+                    <div class="role-id">Source ID: ${slot.source_id}</div>
+                    <div class="role-icon">🎤</div>
+                `;
+                btn.onclick = () => assignRole(slot.source_id);
+                roleList.appendChild(btn);
+            });
+        });
+
+        function assignRole(id) {
+            mySourceId = id;
+            overlay.style.display = 'none';
+            roleDisplay.innerText = id.toUpperCase();
+            initAudio();
+        }
+
+        // 2. Audio Logic
+        async function initAudio() {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                statusText.innerText = "SECURITY ERROR: Context Restricted";
+                alert("CRITICAL: Audio API blocked.\n\nSince Hangar Mesh runs on local network (HTTP), you MUST enable this flag in Chrome / Brave / Edge:\n\nchrome://flags/#unsafely-treat-insecure-origin-as-secure\n\nAnd add this server's IP and PORT to the list.");
+                return;
+            }
+            try {
+                statusText.innerText = "REQUESTING PERMISSION...";
+                // First try standard permission
+                await navigator.mediaDevices.getUserMedia({ audio: true });
+
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const mics = devices.filter(d => d.kind === 'audioinput');
+
+                console.log("Mics found:", mics);
+
+                if (mics.length === 0) {
+                    throw new Error("No audio input devices found in your system.");
+                }
+
+                micSelect.innerHTML = '';
+                mics.forEach(d => {
+                    const opt = document.createElement('option');
+                    opt.value = d.deviceId;
+                    opt.text = d.label || `Mic ${micSelect.length + 1}`;
+                    micSelect.appendChild(opt);
+                });
+
+                // Start with the first one, but don't force 'ideal' if it might fail
+                startStream(mics[0].deviceId);
+
+            } catch (e) {
+                console.error("Init Audio Error:", e);
+                statusText.innerText = "MIC ERROR: " + e.message;
+                statusText.style.color = "orange";
+            }
+        }
+
+        async function startStream(deviceId) {
+            try {
+                // 1. Cleanup old stream and nodes
+                if (localStream) localStream.getTracks().forEach(t => t.stop());
+                if (javascriptNode) {
+                    javascriptNode.onaudioprocess = null;
+                    javascriptNode.disconnect();
+                }
+                if (microphone) microphone.disconnect();
+                if (analyser) analyser.disconnect();
+
+                const constraints = {
+                    audio: {
+                        // Use 'exact' when the user manually selects a device to force the browser to switch
+                        deviceId: deviceId ? { exact: deviceId } : undefined,
+                        echoCancellation: false,
+                        noiseSuppression: false,
+                        autoGainControl: false
+                    },
+                    video: false
+                };
+
+                console.log("Starting stream with constraints:", constraints);
+                localStream = await navigator.mediaDevices.getUserMedia(constraints);
+
+                // VU Meter Logic
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (audioContext.state === 'suspended') await audioContext.resume();
+
+                analyser = audioContext.createAnalyser();
+                microphone = audioContext.createMediaStreamSource(localStream);
+                javascriptNode = audioContext.createScriptProcessor(2048, 1, 1);
+
+                analyser.smoothingTimeConstant = 0.8;
+                analyser.fftSize = 1024;
+
+                microphone.connect(analyser);
+                analyser.connect(javascriptNode);
+                javascriptNode.connect(audioContext.destination);
+
+                javascriptNode.onaudioprocess = function () {
+                    var array = new Uint8Array(analyser.frequencyBinCount);
+                    analyser.getByteFrequencyData(array);
+                    var values = 0;
+                    var length = array.length;
+                    for (var i = 0; i < length; i++) { values += array[i]; }
+                    var average = values / length;
+                    vuLevel.style.height = Math.min(100, average * 2) + '%';
+                }
+
+                statusText.innerText = "READY";
+                statusText.style.color = "#00f3ff";
+
+                // 2. Force renegotiation if already connected
+                if (peerConnection) {
+                    const senders = peerConnection.getSenders();
+                    const audioSender = senders.find(s => s.track && s.track.kind === 'audio');
+                    if (audioSender) {
+                        console.log("Replacing track in existing connection...");
+                        await audioSender.replaceTrack(localStream.getAudioTracks()[0]);
+                    } else {
+                        createOffer();
+                    }
+                } else {
+                    createOffer();
+                }
+
+            } catch (e) {
+                statusText.innerText = "STREAM ERROR: " + e.message;
+                console.error("Stream Start Error:", e);
+                // If 'exact' failed, try one more time without the constraint as fallback
+                if (deviceId) {
+                    console.warn("Exact deviceId failed, retrying with ideal...");
+                    startStream(null);
+                }
+            }
+        }
+
+        // 3. WebRTC Logic
+        async function createOffer() {
+            if (peerConnection) peerConnection.close();
+
+            peerConnection = new RTCPeerConnection(rtcConfig);
+            // Add ONLY audio track
+            const audioTrack = localStream.getAudioTracks()[0];
+            peerConnection.addTrack(audioTrack, localStream);
+
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    socket.emit('candidate', { candidate: event.candidate, target: 'host', from: socket.id });
+                }
+            };
+
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+
+            statusText.innerText = "SIGNALING...";
+            statusText.style.color = "yellow";
+
+            socket.emit('offer', {
+                sdp: offer,
+                type: 'audio',
+                from: socket.id,
+                sourceId: mySourceId
+            });
+        }
+
+        socket.on('answer', async (data) => {
+            if (peerConnection) {
+                await peerConnection.setRemoteDescription(data.sdp);
+                statusText.innerText = "ON AIR";
+                statusText.style.color = "#ff0055";
+            }
+        });
+
+        socket.on('candidate', async (data) => {
+            if (peerConnection) await peerConnection.addIceCandidate(data.candidate);
+        });
+
+    </script>
+</body>
+
+</html>

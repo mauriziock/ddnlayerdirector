@@ -1,0 +1,56 @@
+services:
+  app:
+    build: .
+    container_name: hangar_mesh_app
+    restart: unless-stopped
+    # Conectamos a tu red de proxy para que NPM lo vea por nombre
+    networks:
+      - npm_proxy
+      - default
+    environment:
+      - NODE_ENV=production
+      # Como Go2RTC está en la misma red Docker, usamos su nombre de contenedor
+      - GO2RTC_API=http://hangar_mesh_go2rtc:1984
+      - MEDIAMTX_HOST=hangar_mesh_mediamtx
+      - SESSION_SECRET=change_this_to_something_secure_in_production
+    expose:
+      - "3000"
+    # ports:
+    #   - "3000:3000" # Deshabilitado a petición: usar red npm_proxy
+    volumes:
+      - /home/maw/infra/hangarclickclock/hangar-mesh/data:/app/data
+      - /home/maw/infra/hangarclickclock/hangar-mesh/public:/app/public
+      - /home/maw/infra/hangarclickclock/hangar-mesh/server.js:/app/server.js
+
+  go2rtc:
+    image: alexxit/go2rtc:1.9.4
+    container_name: hangar_mesh_go2rtc
+    restart: unless-stopped
+    networks:
+      - npm_proxy
+      - default
+    ports:
+      - "1984:1984" # API Dashboard
+      - "8554:8554" # RTSP Server
+      - "8555:8555/tcp" # WebRTC TCP Signaling
+      - "8555:8555/udp" # WebRTC UDP (Importante para conexiones directas)
+    volumes:
+      - /home/maw/infra/hangarclickclock/hangar-mesh/go2rtc.yaml:/config/go2rtc.yaml
+
+  mediamtx:
+    image: bluenviron/mediamtx:1.9.3
+    container_name: hangar_mesh_mediamtx
+    restart: unless-stopped
+    networks:
+      - npm_proxy
+      - default
+    ports:
+      - "8544:8544" # RTSP Interno (Custom)
+      - "8890:8890/udp" # SRT Ingest (CRÍTICO: UDP para el stream)
+      - "9997:9997" # API
+    volumes:
+      - /home/maw/infra/hangarclickclock/hangar-mesh/mediamtx.yml:/mediamtx.yml
+
+networks:
+  npm_proxy:
+    external: true

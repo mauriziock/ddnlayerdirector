@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>OBS Vertical Widget Top</title>
+    <style>
+        body {
+            background-color: transparent;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', 'Roboto', monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            /* Centrado total */
+            height: 100vh;
+            width: 100vw;
+            box-sizing: border-box;
+        }
+
+        .container {
+            display: flex;
+            align-items: center;
+            width: 95%;
+            /* Ocupa casi todo el ancho de la capa */
+            background: rgba(0, 15, 20, 0.9);
+            border-top: 0.5vh solid #00f3ff;
+            border-bottom: 0.2vh solid rgba(0, 243, 255, 0.3);
+            padding: 2vh 3vw;
+            border-radius: 1vh;
+            gap: 3vw;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 1vh 3vh rgba(0, 0, 0, 0.5);
+            opacity: 0;
+            transform: translateY(-1vh);
+            transition: all 0.6s cubic-bezier(0.19, 1, 0.22, 1);
+        }
+
+        .container.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        #art {
+            width: 15vw;
+            /* Escala con el ancho de la capa */
+            height: 15vw;
+            max-width: 100px;
+            max-height: 100px;
+            border-radius: 0.5vh;
+            object-fit: cover;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .metadata {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            overflow: hidden;
+            flex-grow: 1;
+        }
+
+        .track-name {
+            font-size: 5vw;
+            /* Tipografía fluida */
+            font-weight: 800;
+            color: #fff;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1.1;
+        }
+
+        .artist-name {
+            font-size: 3.5vw;
+            color: #00f3ff;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.2vw;
+        }
+
+        .audio-bus {
+            font-size: 2vw;
+            color: #555;
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            border-left: 1px solid #333;
+            padding-left: 1vw;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="widget" class="container">
+        <img id="art" src="" alt="art">
+        <div class="metadata">
+            <div id="track" class="track-name">ESPERANDO DATOS</div>
+            <div id="artist" class="artist-name">SISTEMA LISTO</div>
+        </div>
+        <div class="audio-bus">CH_01</div>
+    </div>
+
+    <script>
+        const CONFIG = { apiKey: '3c93be4fddcf1fef5e080971b8115cd9', user: 'mauriziock', pollInterval: 5000 };
+        const elements = { widget: document.getElementById('widget'), art: document.getElementById('art'), track: document.getElementById('track'), artist: document.getElementById('artist') };
+        let currentTrackName = '';
+
+        async function fetchNowPlaying() {
+            try {
+                const res = await fetch(`https://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user=${CONFIG.user}&api_key=${CONFIG.apiKey}&format=json&limit=1`);
+                const data = await res.json();
+                if (!data.recenttracks || !data.recenttracks.track.length) { hideWidget(); return; }
+                const track = data.recenttracks.track[0];
+                if (track['@attr'] && track['@attr'].nowplaying === 'true') updateDOM(track);
+                else hideWidget();
+            } catch (e) { console.error(e); }
+        }
+
+        function updateDOM(track) {
+            if (currentTrackName === track.name) { if (!elements.widget.classList.contains('active')) showWidget(); return; }
+            currentTrackName = track.name;
+            elements.track.textContent = track.name;
+            elements.artist.textContent = track.artist['#text'];
+            const img = track.image[3]['#text'] || track.image[2]['#text'];
+            if (img) { elements.art.src = img; elements.art.style.display = 'block'; } else elements.art.style.display = 'none';
+            showWidget();
+        }
+        function showWidget() { elements.widget.classList.add('active'); }
+        function hideWidget() { elements.widget.classList.remove('active'); currentTrackName = ''; }
+        setInterval(fetchNowPlaying, CONFIG.pollInterval); fetchNowPlaying();
+    </script>
+</body>
+
+</html>

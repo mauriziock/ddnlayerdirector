@@ -1,0 +1,10 @@
+node_modules
+logs
+*.log
+mediamtx
+mediamtx.tar.gz
+go2rtc
+.DS_Store
+.vscode
+.idea
+*.sh

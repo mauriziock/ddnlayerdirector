@@ -1,0 +1,14 @@
+node_modules
+logs
+.git
+.vscode
+.DS_Store
+mediamtx
+mediamtx.tar.gz
+go2rtc
+users.json
+scenes.json
+*.sh
+docker-compose.yml
+# We exclude config files so they are not baked into the image, 
+# but mounted as volumes (or generated fresh if missing)

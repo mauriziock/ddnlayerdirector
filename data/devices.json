@@ -1,0 +1,23 @@
+[
+  {
+    "id": "migrated_17682588278950.8787847140941072",
+    "name": "Studio_CAM",
+    "type": "onvif_video",
+    "source_id": "studio_cam",
+    "url": "rtsp://admin:15251809mM*@192.168.4.28:8554/Streaming/Channels/101"
+  },
+  {
+    "id": "migrated_17682588278950.1588459430033009",
+    "name": "s25",
+    "type": "srt_video",
+    "source_id": "s25",
+    "url": ""
+  },
+  {
+    "id": "1768261670464",
+    "name": "webtortmp",
+    "type": "onvif_video",
+    "source_id": "mawpc",
+    "url": "rtmp://100.64.0.11:1935/live/test"
+  }
+]

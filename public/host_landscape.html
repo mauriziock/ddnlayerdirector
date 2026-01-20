@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hangar Host</title>
+    <script src="/socket.io/socket.io.js?v=TIMESTAMP_BUST"></script>
+    <style>
+        body {
+            margin: 0;
+            background: #000;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        .layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            transform-origin: top left;
+            overflow: hidden;
+        }
+
+        iframe {
+            border: none;
+            width: 100%;
+            height: 100%;
+            pointer-events: auto;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Debug overlay */
+        #debug {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            color: #0f0;
+            font-size: 10px;
+            padding: 5px;
+            z-index: 9999;
+            pointer-events: none;
+            text-shadow: 1px 1px 2px black;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="canvas"></div>
+    <div id="debug">HOST INITIALIZING...</div>
+    <div id="touch-surface" style="position:fixed; top:0; left:0; width:100%; height:100%; z-index:10000;"></div>
+
+    <script>
+        // --- 0. ROBUST LOGGING SYSTEM ---
+        const debug = document.getElementById('debug');
+
+        function log(msg) {
+            console.log(msg);
+            if (debug) debug.innerText = msg;
+
+            // 1. Force HTTP Log (Guaranteed Delivery)
+            if (navigator.sendBeacon) {
+                // navigator.sendBeacon('/api/log?msg=' + encodeURIComponent(msg)); // Often better for unload
+                // But GET is easier for simplest server endpoint
+                fetch('/api/log?msg=' + encodeURIComponent(msg)).catch(e => { });
+            } else {
+                fetch('/api/log?msg=' + encodeURIComponent(msg)).catch(e => { });
+            }
+
+            // 2. Socket Log (Realtime if connected)
+            if (window.socket && window.socket.connected) {
+                window.socket.emit('client_log', msg);
+            }
+        }
+
+        window.onerror = function (msg, source, lineno, colno, error) {
+            log(`CRASH: ${msg} LINE:${lineno} SRC:${source}`);
+            return false;
+        };
+
+        log("HOST SCRIPT V3 STARTING..."); // Version Marker
+
+        // --- 1. SOCKET INIT ---
+        const socket = io();
+        window.socket = socket;
+
+        socket.on('connect', () => {
+            log("SOCKET CONNECTED: " + socket.id);
+        });
+
+        socket.on('connect_error', (err) => {
+            log("SOCKET ERROR: " + err.message);
+        });
+
+        // --- AUTOPLAY UNLOCKER ---
+        const overlay = document.createElement('div');
+        overlay.id = 'init-overlay';
+        overlay.style = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:99999;display:flex;justify-content:center;align-items:center;color:white;font-family:monospace;cursor:pointer;';
+        overlay.innerHTML = '<h1>CLICK TO INITIALIZE ENGINE</h1>';
+        document.body.appendChild(overlay);
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const myTarget = urlParams.get('target') || 'landscape';
+
+        overlay.onclick = () => {
+            overlay.remove();
+            socket.emit('register', { role: 'host', target: myTarget });
+            log(`ENGINE REGISTERED AS HOST (LANDSCAPE)`);
+        };
+
+        const canvas = document.getElementById('canvas');
+        const peers = {}; // Connection storage
+        const streams = {}; // SourceId -> Stream
+        let currentScene = null;
+        let firstSceneReceived = false;
+
+        // --- 2. SCENE RENDERER ---
+        socket.on('scene_update', (scene) => {
+            currentScene = scene;
+            renderScene(scene);
+
+            if (!firstSceneReceived) {
+                firstSceneReceived = true;
+                log("FIRST SCENE READY - REQUESTING OFFERS");
+                socket.emit('request_offers');
+            }
+        });
+
+        function renderScene(scene) {
+            log(`Rendering Scene: ${scene.active_scene || 'unknown'} (${scene.layers.length} layers)`);
+
+            // Reconcile DOM
+            const existing = Array.from(document.querySelectorAll('.layer'));
+            const newIds = scene.layers.map(l => l.id);
+
+            // Cleanup
+            existing.forEach(el => {
+                if (!newIds.includes(el.id)) {
+                    if (window.go2rtcPeers && window.go2rtcPeers[el.id]) {
+                        window.go2rtcPeers[el.id].close();
+                        delete window.go2rtcPeers[el.id];
+                    }
+                    el.remove();
+                }
+            });
+
+            // Create/Update
+            scene.layers.sort((a, b) => a.z_index - b.z_index).forEach(layerData => {
+                let el = document.getElementById(layerData.id);
+
+                if (!el) {
+                    log(`Creating Layer: ${layerData.id} [${layerData.type}]`);
+                    el = document.createElement('div');
+                    el.id = layerData.id;
+                    el.className = 'layer';
+
+                    if (layerData.type === 'web_source') {
+                        const iframe = document.createElement('iframe');
+                        iframe.src = layerData.url;
+                        el.appendChild(iframe);
+                    } else if (layerData.type === 'image_source') {
+                        const img = document.createElement('img');
+                        img.id = `img-${layerData.id}`;
+                        img.src = layerData.url;
+                        img.style.width = '100%';
+                        img.style.height = '100%';
+                        img.style.objectFit = 'contain';
+                        el.appendChild(img);
+                    } else if (layerData.type === 'text_source') {
+                        const span = document.createElement('span');
+                        span.id = `text-${layerData.id}`;
+                        span.innerText = layerData.content || '';
+                        span.style.color = 'white';
+                        span.style.fontSize = '2vw';
+                        span.style.fontWeight = 'bold';
+                        span.style.textShadow = '2px 2px 4px black';
+                        span.style.display = 'flex';
+                        span.style.alignItems = 'center';
+                        span.style.justifyContent = 'center';
+                        span.style.width = '100%';
+                        span.style.height = '100%';
+                        el.appendChild(span);
+                    } else if (layerData.type === 'webrtc_video' || layerData.type === 'webrtc_audio') {
+                        const tag = layerData.type === 'webrtc_audio' ? 'audio' : 'video';
+                        const media = document.createElement(tag);
+                        media.autoplay = true;
+                        media.playsInline = true;
+                        // Respect muted property from scene data
+                        media.muted = layerData.muted !== undefined ? layerData.muted : (tag === 'video');
+                        if (streams[layerData.source_id]) {
+                            media.srcObject = streams[layerData.source_id];
+                        }
+                        el.appendChild(media);
+                    } else if (layerData.type === 'local_video') {
+                        const vid = document.createElement('video');
+                        vid.autoplay = true;
+                        vid.muted = true;
+                        vid.playsInline = true;
+                        navigator.mediaDevices.getUserMedia({ video: true }).then(s => vid.srcObject = s);
+                        el.appendChild(vid);
+                    } else if (layerData.type === 'srt_video' || layerData.type === 'onvif_video') {
+                        log(`Init Go2RTC Layer: ${layerData.id}`);
+                        const vid = document.createElement('video');
+                        vid.muted = layerData.muted !== undefined ? layerData.muted : true;
+                        vid.playsInline = true;
+                        el.appendChild(vid);
+                        if (window.startGo2RTC) window.startGo2RTC(vid, layerData.source_id, layerData.id);
+                    }
+
+                    canvas.appendChild(el);
+                } else {
+                    // Update existing content if needed
+                    if (layerData.type === 'text_source') {
+                        const span = document.getElementById(`text-${layerData.id}`);
+                        if (span && span.innerText !== layerData.content) span.innerText = layerData.content;
+                    } else if (layerData.type === 'image_source') {
+                        const img = document.getElementById(`img-${layerData.id}`);
+                        if (img && img.src !== layerData.url) img.src = layerData.url;
+                    } else if (layerData.type === 'webrtc_video' || layerData.type === 'webrtc_audio') {
+                        const media = el.querySelector('video, audio');
+                        if (media && !media.srcObject && streams[layerData.source_id]) {
+                            log(`Re-attaching stream to ${layerData.id}`);
+                            media.srcObject = streams[layerData.source_id];
+                            media.play().catch(e => { });
+                        }
+                    }
+                }
+
+                // Update Transforms
+                if (layerData.visible !== false) {
+                    if (layerData.type === 'webrtc_audio') {
+                        // Audio elements must be "visible" to the DOM to play in some browsers
+                        el.style.display = 'block';
+                        el.style.opacity = '0';
+                        el.style.pointerEvents = 'none';
+                        el.style.position = 'fixed';
+                        el.style.top = '-100px';
+                    } else {
+                        el.style.width = layerData.position.width + '%';
+                        el.style.height = layerData.position.height + '%';
+                        el.style.left = layerData.position.x + '%';
+                        el.style.top = layerData.position.y + '%';
+                        el.style.zIndex = layerData.z_index;
+                        el.style.transform = `rotate(${layerData.rotation || 0}deg)`;
+                        el.style.opacity = layerData.opacity !== undefined ? layerData.opacity : 1;
+                        el.style.display = 'block';
+                        el.style.position = 'absolute';
+                    }
+
+                    // SYNC MUTE & VOLUME STATE
+                    const media = el.querySelector('video, audio');
+                    if (media) {
+                        // 1. Mute State
+                        const shouldBeMuted = layerData.muted === true; // Default false
+                        if (media.muted !== shouldBeMuted) {
+                            media.muted = shouldBeMuted;
+                            if (!shouldBeMuted) {
+                                media.play().catch(() => { });
+                            }
+                        }
+
+                        // 2. Volume Level
+                        const targetVol = layerData.volume !== undefined ? parseFloat(layerData.volume) : 1;
+                        if (media.volume !== targetVol) {
+                            media.volume = targetVol;
+                        }
+
+                        // 3. Safety Check: If it should be playing but it's paused
+                        if (!media.muted && media.paused && (layerData.type === 'webrtc_audio' || streams[layerData.source_id])) {
+                            media.play().catch(() => { });
+                        }
+                    }
+                } else {
+                    el.style.display = 'none';
+                }
+            });
+        }
+
+        // --- 3. Go2RTC LOGIC ---
+        window.go2rtcPeers = {};
+
+        window.startGo2RTC = async (videoEl, streamId, layerId) => {
+            log(`[Go2RTC] Start: ${streamId}`);
+
+            if (window.go2rtcPeers[layerId]) {
+                window.go2rtcPeers[layerId].close();
+                delete window.go2rtcPeers[layerId];
+            }
+
+            const pc = new RTCPeerConnection({
+                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+            });
+            window.go2rtcPeers[layerId] = pc;
+
+            pc.onconnectionstatechange = () => log(`[Go2RTC] ${streamId} STATE: ${pc.connectionState}`);
+
+            pc.addTransceiver('video', { direction: 'recvonly' });
+            pc.addTransceiver('audio', { direction: 'recvonly' });
+
+            pc.ontrack = (ev) => {
+                const stream = ev.streams[0];
+                log(`[Go2RTC] Track from ${streamId}`); // (${ev.track.kind})
+
+                const current = videoEl.srcObject;
+                if (!current || current.id !== stream.id) {
+                    videoEl.srcObject = stream;
+                    videoEl.play().catch(e => log(`Play Fail ${streamId}: ${e.message}`));
+                }
+            };
+
+            try {
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+
+                const go2rtcUrl = `/api/go2rtc?src=${encodeURIComponent(streamId)}`;
+                log(`[Go2RTC] Fetching ${go2rtcUrl}`);
+
+                const res = await fetch(go2rtcUrl, {
+                    method: 'POST',
+                    body: pc.localDescription.sdp,
+                    headers: { 'Content-Type': 'text/plain' }
+                });
+
+                if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+
+                const answer = await res.text();
+                await pc.setRemoteDescription({ type: 'answer', sdp: answer });
+                log(`[Go2RTC] Signal OK: ${streamId}`);
+            } catch (e) {
+                log(`[Go2RTC] ERROR ${streamId}: ${e.message}`);
+                console.error(e);
+                // Retry
+                setTimeout(() => {
+                    if (document.getElementById(layerId)) {
+                        startGo2RTC(videoEl, streamId, layerId);
+                    }
+                }, 5000);
+            }
+        };
+
+        // --- 4. WebRTC (Original P2P) ---
+        socket.on('offer', async (data) => {
+            log(`WebRTC Offer from: ${data.sourceId} (${data.from})`);
+
+            if (peers[data.from]) {
+                log(`Cleaning up old PC for ${data.from}`);
+                peers[data.from].close();
+            }
+
+            const pc = new RTCPeerConnection({
+                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+            });
+
+            peers[data.from] = pc;
+
+            pc.onicecandidate = (event) => {
+                if (event.candidate) {
+                    socket.emit('candidate', {
+                        candidate: event.candidate,
+                        target: data.from,
+                        from: 'host'
+                    });
+                }
+            };
+
+            pc.ontrack = (event) => {
+                log(`WebRTC Track Received from: ${data.sourceId}`);
+                const stream = event.streams[0];
+                streams[data.sourceId] = stream;
+
+                if (currentScene) {
+                    const layer = currentScene.layers.find(l => l.source_id === data.sourceId);
+                    if (layer) {
+                        const el = document.getElementById(layer.id);
+                        if (el) {
+                            const media = el.querySelector('video, audio');
+                            if (media && media.srcObject !== stream) {
+                                log(`Attaching direct P2P stream to ${layer.id}`);
+                                media.srcObject = stream;
+                                media.play().catch(e => log(`Audio Play Error: ${e.message}`));
+                            }
+                        }
+                    } else {
+                        log(`WARN: No layer found for source_id ${data.sourceId}`);
+                    }
+                }
+            };
+
+            try {
+                await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+
+                log(`Sending answer to ${data.from}`);
+                socket.emit('answer', {
+                    sdp: answer,
+                    target: data.from
+                });
+            } catch (e) {
+                log(`WebRTC Error: ${e.message}`);
+            }
+        });
+
+        socket.on('candidate', async (data) => {
+            const pc = peers[data.from];
+            if (pc) {
+                try {
+                    await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+                } catch (e) {
+                    log(`ICE Error: ${e.message}`);
+                }
+            }
+        });
+
+        // --- 5. INTERACTION LOGIC (FULLSCREEN) ---
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    log(`Error enabling fullscreen: ${err.message}`);
+                });
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+
+        const touchSurface = document.getElementById('touch-surface');
+        if (touchSurface) {
+            // Mouse
+            touchSurface.addEventListener('dblclick', () => {
+                log("Interaction: Double Click");
+                toggleFullscreen();
+            });
+
+            // Touch
+            let lastTap = 0;
+            touchSurface.addEventListener('touchend', (e) => {
+                const currentTime = new Date().getTime();
+                const tapLength = currentTime - lastTap;
+                if (tapLength < 500 && tapLength > 0) {
+                    log("Interaction: Double Tap");
+                    if (e.cancelable) e.preventDefault();
+                    toggleFullscreen();
+                }
+                lastTap = currentTime;
+            });
+        }
+
+    </script>
+</body>
+
+</html>

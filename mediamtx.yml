@@ -1,0 +1,19 @@
+# MediaMTX Configuration
+api: yes
+apiAddress: :9997
+
+protocols: [tcp]
+# Move MediaMTX RTSP to 8544 to avoid any conflict with Go2RTC
+rtspAddress: :8544
+
+srt: yes
+srtAddress: :8890
+
+logLevel: debug
+
+paths:
+  all:
+    publishUser: 
+    publishPass: 
+    readUser: 
+    readPass: 

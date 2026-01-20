@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Hangar Standard Template</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', sans-serif;
+            background: transparent;
+            color: white;
+            transition: background 0.5s ease;
+        }
+
+        body.state-idle {
+            background: rgba(0, 0, 0, 0.4);
+        }
+
+        .container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 40px;
+            box-sizing: border-box;
+        }
+
+        .header {
+            border-left: 4px solid #00f3ff;
+            padding-left: 15px;
+        }
+
+        .alert-box {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.8);
+            background: rgba(255, 0, 0, 0.2);
+            border: 2px solid red;
+            padding: 30px;
+            text-align: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            backdrop-filter: blur(10px);
+        }
+
+        .alert-box.active {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            background: #00f3ff;
+            color: black;
+            font-weight: bold;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="status-badge">System Live</div>
+            <h1>STANDARD PACKAGE</h1>
+        </div>
+
+        <div id="alert-ui" class="alert-box">
+            <h2 style="margin:0; color:red;">⚠️ ALERTA ⚠️</h2>
+            <p id="alert-msg">Mensaje de sistema recibido</p>
+        </div>
+    </div>
+
+    <script>
+        // EL BRIDGE ESTÁNDAR
+        window.addEventListener('message', (event) => {
+            const { type, key, value, payload } = event.data;
+            console.log("[PACKAGE BRIDGE]", { type, key, value, payload });
+
+            // Manejo de Estados (TOGGLES)
+            if (type === 'state') {
+                if (value) document.body.classList.add(key);
+                else document.body.classList.remove(key);
+            }
+
+            // Manejo de Triggers (TRANSIENTS)
+            if (type === 'trigger') {
+                if (key === 'alert') {
+                    const ui = document.getElementById('alert-ui');
+                    const msg = document.getElementById('alert-msg');
+                    msg.innerText = payload?.message || "Alerta de sistema";
+
+                    ui.classList.add('active');
+                    setTimeout(() => ui.classList.remove('active'), 5000);
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>

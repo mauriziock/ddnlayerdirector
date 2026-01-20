@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="es" style="background:#000; color: #00f3ff; font-family: monospace;">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hangar Camera Source</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            height: 100vh;
+        }
+
+        /* FULLSCREEN OVERLAY FOR ROLE SELECTION */
+        #role-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .role-btn {
+            background: #222;
+            border: 1px solid #00f3ff;
+            color: #fff;
+            padding: 20px;
+            width: 80%;
+            max-width: 400px;
+            margin: 10px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            text-align: left;
+            position: relative;
+        }
+
+        .role-btn:hover {
+            background: #333;
+        }
+
+        .role-id {
+            font-size: 0.8rem;
+            color: #888;
+        }
+
+        .role-icon {
+            position: absolute;
+            right: 20px;
+            top: 20px;
+            font-size: 1.5rem;
+        }
+
+        /* MAIN UI */
+        video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 1;
+        }
+
+        .hud {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            padding: 20px;
+            background: linear-gradient(0deg, #000 0%, transparent 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .lens-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .lens-btn {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #00f3ff;
+            color: #00f3ff;
+            padding: 10px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+
+        .status-bar {
+            font-size: 1rem;
+            margin-bottom: 20px;
+            text-shadow: 0 0 5px #000;
+        }
+
+        .rec-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background: red;
+            border-radius: 50%;
+            box-shadow: 0 0 5px red;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ROLE SELECTION -->
+    <div id="role-overlay">
+        <h2 style="color:#00f3ff; margin-bottom:30px;">SELECT CAMERA ROLE</h2>
+        <div id="role-list" style="width:100%; display:flex; flex-direction:column; align-items:center;">
+            <div style="color:#666;">Waiting for Director scenes...</div>
+        </div>
+    </div>
+
+    <!-- PREVIEW -->
+    <video id="preview" autoplay muted playsinline></video>
+
+    <!-- CONTROLS -->
+    <div class="hud">
+        <div class="status-bar">
+            <span id="role-display" style="color:#aaa;">NO ROLE</span> •
+            <span id="status-text" style="color:red">OFFLINE</span>
+        </div>
+
+        <div class="lens-controls">
+            <button class="lens-btn" onclick="cycleLens()">⭕ SWITCH LENS</button>
+        </div>
+        <div id="debug-log"
+            style="font-size:10px; color:#0f0; max-height:100px; overflow-y:auto; width:90%; background:rgba(0,0,0,0.5); padding:5px; text-align:left;">
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        const debugLog = document.getElementById('debug-log');
+        function log(msg) {
+            console.log(msg);
+            // Send to server for remote debugging
+            if (socket && socket.connected) socket.emit('client_log', `[${mySourceId || 'CAM'}]: ${msg}`);
+
+            const line = document.createElement('div');
+            line.innerText = `> ${msg}`;
+            debugLog.insertBefore(line, debugLog.firstChild);
+            if (debugLog.children.length > 20) debugLog.lastChild.remove();
+        }
+
+        // State
+        let mySourceId = null;
+        let localStream = null;
+        let peerConnection = null;
+        let videoDevices = [];
+        let currentDeviceIndex = 0;
+        let currentQuality = 'medium'; // Default quality
+
+        const preview = document.getElementById('preview');
+        const statusText = document.getElementById('status-text');
+        const roleList = document.getElementById('role-list');
+        const overlay = document.getElementById('role-overlay');
+        const roleDisplay = document.getElementById('role-display');
+
+        const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+        // 1. Initial Logic: Register as candidate to get scene
+        socket.emit('register', 'source_candidate');
+
+        socket.on('scene_update', (scene) => {
+            // Check if my layer has config
+            if (mySourceId) {
+                const myLayer = scene.layers.find(l => l.source_id === mySourceId);
+                if (myLayer) {
+                    // Check Quality
+                    if (myLayer.camera_quality && myLayer.camera_quality !== currentQuality) {
+                        log("Applying saved quality: " + myLayer.camera_quality);
+                        currentQuality = myLayer.camera_quality;
+                        applyQuality();
+                    }
+                    // Check Pref (Lens)
+                    if (myLayer.camera_pref) {
+                        // (Logic remains for initial lens selection if needed, but usually we wait for command)
+                    }
+                }
+            }
+
+            // Only populate list if we haven't selected a role yet
+            if (mySourceId) return;
+
+            const videoSlots = scene.layers.filter(l => l.type.includes('webrtc_video'));
+            roleList.innerHTML = '';
+
+            if (videoSlots.length === 0) {
+                roleList.innerHTML = '<div style="color:#666;">No camera slots available in current scene.</div>';
+                return;
+            }
+
+            videoSlots.forEach(slot => {
+                const btn = document.createElement('button');
+                btn.className = 'role-btn';
+                btn.innerHTML = `
+                    <div>${slot.id}</div>
+                    <div class="role-id">Source ID: ${slot.source_id}</div>
+                    <div class="role-icon">📷</div>
+                `;
+                btn.onclick = () => assignRole(slot.source_id);
+                roleList.appendChild(btn);
+            });
+        });
+
+        function assignRole(id) {
+            mySourceId = id;
+            overlay.style.display = 'none';
+            roleDisplay.innerText = id.toUpperCase();
+
+            // Re-register as generic source (or keep candidate, doesn't matter much unless server logic depends on it)
+            // Start Camera & Offer
+            initCamera();
+        }
+
+        // Wake Lock
+        let wakeLock = null;
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    wakeLock.addEventListener('release', () => console.log('Screen Lock Released'));
+                    console.log('Screen Lock Active');
+                }
+            } catch (err) {
+                console.log(`Wake Lock Error: ${err.message}`);
+            }
+        }
+
+        // 2. Camera Logic
+        let currentResolution = { width: 1920, height: 1080 }; // Default
+
+        async function initCamera() {
+            log("Initializing Camera...");
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                statusText.innerText = "SECURITY ERROR: Secure Context Required";
+                log("ERR: Security Error");
+                alert("CRITICAL: Camera API is blocked by the browser.\n\nSince Hangar Mesh runs on local network (HTTP), you MUST enable this flag in Chrome / Brave / Edge:\n\nchrome://flags/#unsafely-treat-insecure-origin-as-secure\n\nAnd add this server's IP and PORT to the list.");
+                return;
+            }
+
+            await requestWakeLock();
+
+            try {
+                // 1. Get Permission
+                await navigator.mediaDevices.getUserMedia({ video: true });
+
+                // 2. Enumerate
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                videoDevices = devices.filter(d => d.kind === 'videoinput');
+                log("Devices found: " + videoDevices.length);
+                videoDevices.forEach(d => log(`- ${d.label || 'Unknown'} (${d.deviceId.substr(0, 4)}...)`));
+
+                // Prioritize back camera
+                const backIndex = videoDevices.findIndex(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('trasera'));
+                if (backIndex !== -1) currentDeviceIndex = backIndex;
+
+                // BROADCAST CAPABILITIES
+                await broadcastSourceInfo();
+
+                startStream(videoDevices[currentDeviceIndex]?.deviceId);
+
+            } catch (e) {
+                statusText.innerText = "CAM ERROR: " + e.message;
+                log("Init Error: " + e.message);
+            }
+        }
+
+        async function applyQuality() {
+            if (!peerConnection) return;
+            const sender = peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+            if (!sender) {
+                log("Quality Warn: No Video Sender found");
+                return;
+            }
+
+            const params = sender.getParameters();
+            if (!params.encodings) params.encodings = [{}];
+
+            let bitrate = undefined;
+            switch (currentQuality) {
+                case 'low': bitrate = 500000; break;     // 500 kbps
+                case 'medium': bitrate = 1500000; break; // 1.5 Mbps
+                case 'high': bitrate = 4000000; break;   // 4 Mbps
+                case 'ultra': bitrate = 10000000; break; // 10 Mbps (Unlimited-ish)
+            }
+
+            if (bitrate) {
+                params.encodings[0].maxBitrate = bitrate;
+                log(`Setting maxBitrate to ${bitrate / 1000} kbps`);
+            } else {
+                delete params.encodings[0].maxBitrate;
+                log("Setting maxBitrate to UNLIMITED");
+            }
+
+            try {
+                await sender.setParameters(params);
+            } catch (e) {
+                log(`Bandwidth Error: ${e.message}`);
+            }
+        }
+
+        // Remote Control Listener
+        socket.on('control_command', (cmd) => {
+            if (cmd.target !== mySourceId) return;
+            log(`CMD: ${cmd.action} ${cmd.value}`);
+
+            if (cmd.action === 'set_pref') {
+                const exactMatch = videoDevices.find(d => d.deviceId === cmd.value);
+                if (exactMatch) {
+                    log("Switching to exact: " + exactMatch.label);
+                    startStream(exactMatch.deviceId);
+                } else {
+                    const target = videoDevices.find(d => d.label.toLowerCase().includes(cmd.value.toLowerCase()));
+                    if (target) {
+                        log("Switching to fuzzy: " + target.label);
+                        startStream(target.deviceId);
+                    } else {
+                        log("CMD Error: Lens not found");
+                    }
+                }
+            }
+
+            if (cmd.action === 'set_quality') {
+                currentQuality = cmd.value;
+                statusText.innerText = `QUAL: ${currentQuality.toUpperCase()}`;
+                applyQuality();
+            }
+        });
+
+        async function startStream(deviceId) {
+            log(`Starting stream... Device: ${deviceId ? deviceId.substr(0, 4) + '...' : 'Default'}`);
+
+            // 1. Clean stop of previous streams
+            if (localStream) {
+                localStream.getTracks().forEach(t => t.stop());
+                localStream = null;
+            }
+
+            // 2. Hardware Release Delay (Crucial for Android)
+            await new Promise(r => setTimeout(r, 500));
+
+            try {
+                // 3. Simple Constraints (No Resolution Force)
+                const constraints = {
+                    video: {
+                        deviceId: deviceId ? { exact: deviceId } : undefined,
+                        frameRate: { ideal: 30 }
+                    },
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true
+                    }
+                };
+
+                log(`Requesting simple constraints...`);
+                localStream = await navigator.mediaDevices.getUserMedia(constraints);
+
+                preview.srcObject = localStream;
+                createOffer();
+
+                // 4. Apply quality after short delay
+                setTimeout(applyQuality, 1000);
+
+            } catch (err) {
+                log("Stream Error: " + err.name + " " + err.message);
+
+                // Fallback: Total Reset
+                try {
+                    log("Fallback: Panic mode (Audio+Video generic)");
+                    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                    preview.srcObject = localStream;
+                    createOffer();
+                    log("Fallback success!");
+                } catch (err2) {
+                    log("Fatal Error: " + err2.message);
+                }
+            }
+        }
+
+        window.cycleLens = () => {
+            if (videoDevices.length < 2) {
+                log("Cannot switch: Only 1 device found.");
+                alert(`Devices found: ${videoDevices.length}. Check permissions.`);
+                return;
+            }
+            currentDeviceIndex = (currentDeviceIndex + 1) % videoDevices.length;
+            log(`Cycling to: ${videoDevices[currentDeviceIndex].label}`);
+            startStream(videoDevices[currentDeviceIndex].deviceId);
+        }
+
+        // 3. WebRTC Logic
+        async function createOffer() {
+            if (peerConnection) peerConnection.close();
+
+            peerConnection = new RTCPeerConnection(rtcConfig);
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    socket.emit('candidate', { candidate: event.candidate, target: 'host', from: socket.id });
+                }
+            };
+
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+
+            statusText.innerText = "SIGNALING...";
+            statusText.style.color = "yellow";
+
+            socket.emit('offer', {
+                sdp: offer,
+                type: 'video',
+                from: socket.id,
+                sourceId: mySourceId // Crucial: This tells Host which slot we fill
+            });
+        }
+
+        socket.on('request_offers', () => {
+            if (mySourceId && localStream) {
+                statusText.innerText = "HOST SYNC...";
+                createOffer();
+            }
+            // Always re-broadcast capabilities when requested
+            broadcastSourceInfo();
+        });
+
+        function broadcastSourceInfo() {
+            if (!videoDevices || !mySourceId) {
+                console.warn("Skipping info broadcast", videoDevices?.length, mySourceId);
+                return;
+            }
+            console.log("Broadcasting info for", mySourceId);
+            socket.emit('source_info', {
+                sourceId: mySourceId,
+                devices: videoDevices.map(d => ({ label: d.label, deviceId: d.deviceId }))
+            });
+        }
+
+        socket.on('answer', async (data) => {
+            if (peerConnection) {
+                await peerConnection.setRemoteDescription(data.sdp);
+                statusText.innerText = "ONLINE";
+                statusText.style.color = "#00f3ff";
+            }
+        });
+
+        socket.on('candidate', async (data) => {
+            if (peerConnection) await peerConnection.addIceCandidate(data.candidate);
+        });
+
+    </script>
+</body>
+
+</html>

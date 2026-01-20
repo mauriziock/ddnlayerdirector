@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Hangar 89: Dirty Signal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --cyan: #00f3ff;
+            --cyan-dim: rgba(0, 243, 255, 0.1);
+            --red: #ff3333;
+            --bg-grid: rgba(0, 243, 255, 0.02);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            width: 1080px;
+            height: 1920px;
+            background: transparent;
+            font-family: 'Share Tech Mono', monospace;
+            overflow: hidden;
+            text-transform: uppercase;
+            color: var(--cyan);
+        }
+
+        /* --- 1. FONDO Y GRILLA --- */
+        .tactical-grid {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image:
+                linear-gradient(var(--bg-grid) 1px, transparent 1px),
+                linear-gradient(90deg, var(--bg-grid) 1px, transparent 1px);
+            background-size: 60px 60px;
+            z-index: 0;
+        }
+
+        /* --- 2. GENERADOR DE BASURA (SCATTERED NOISE) --- */
+        /* Contenedor para elementos flotantes aleatorios */
+        #debris-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+            /* Detrás de la cámara */
+        }
+
+        .junk-data {
+            position: absolute;
+            font-size: 0.8rem;
+            color: rgba(0, 243, 255, 0.4);
+            user-select: none;
+        }
+
+        .tiny-cross {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+        }
+
+        .tiny-cross::before,
+        .tiny-cross::after {
+            content: '';
+            position: absolute;
+            background: rgba(0, 243, 255, 0.3);
+        }
+
+        .tiny-cross::before {
+            top: 4px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+        }
+
+        .tiny-cross::after {
+            left: 4px;
+            top: 0;
+            height: 100%;
+            width: 2px;
+        }
+
+        /* --- 3. GLITCH EFFECTS --- */
+        .glitch-char {
+            display: inline-block;
+            animation: text-flicker 3s infinite alternate;
+        }
+
+        .severe-glitch {
+            animation: text-skew 0.5s infinite;
+            color: var(--red);
+            font-weight: bold;
+        }
+
+        @keyframes text-flicker {
+            0% {
+                opacity: 1;
+                transform: translateX(0);
+            }
+
+            5% {
+                opacity: 0.1;
+                transform: translateX(2px);
+            }
+
+            10% {
+                opacity: 1;
+                transform: translateX(0);
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+
+        @keyframes text-skew {
+            0% {
+                transform: skew(0deg);
+            }
+
+            20% {
+                transform: skew(-20deg);
+            }
+
+            40% {
+                transform: skew(10deg);
+            }
+
+            60% {
+                transform: skew(-5deg);
+            }
+
+            80% {
+                transform: skew(5deg);
+            }
+        }
+
+        /* --- 4. ESTRUCTURA PRINCIPAL (DESPLAZADA HACIA ABAJO) --- */
+
+        /* STATUS STACK: Bajado a px 480 para dar espacio al player arriba */
+        .status-stack {
+            position: absolute;
+            top: 480px;
+            left: 30px;
+            display: flex;
+            gap: 15px;
+            z-index: 20;
+        }
+
+        .status-badge {
+            font-size: 1rem;
+            letter-spacing: 2px;
+            padding: 4px 10px;
+            border: 1px solid;
+            backdrop-filter: blur(2px);
+        }
+
+        .st-rec {
+            border-color: var(--red);
+            color: var(--red);
+            animation: pulse 2s infinite;
+        }
+
+        .st-live {
+            border-color: var(--cyan);
+            color: var(--cyan);
+        }
+
+        /* CAMERA FRAME: Bajado a px 530 */
+        .camera-frame {
+            position: absolute;
+            top: 530px;
+            left: 30px;
+            width: 860px;
+            /* Viewport asimétrico */
+            height: 484px;
+            border: 1px solid rgba(0, 243, 255, 0.6);
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.05);
+            z-index: 10;
+        }
+
+        /* Esquinas técnicas */
+        .c-corner {
+            position: absolute;
+            width: 15px;
+            height: 15px;
+            border-color: var(--cyan);
+            border-style: solid;
+        }
+
+        .cc-tl {
+            top: -1px;
+            left: -1px;
+            border-width: 4px 0 0 4px;
+        }
+
+        .cc-tr {
+            top: -1px;
+            right: -1px;
+            border-width: 4px 4px 0 0;
+        }
+
+        .cc-bl {
+            bottom: -1px;
+            left: -1px;
+            border-width: 0 0 4px 4px;
+        }
+
+        .cc-br {
+            bottom: -1px;
+            right: -1px;
+            border-width: 0 4px 4px 0;
+        }
+
+        .cam-id {
+            position: absolute;
+            bottom: -25px;
+            right: 0;
+            background: var(--cyan);
+            color: #000;
+            font-weight: 800;
+            padding: 2px 15px;
+            font-size: 1.2rem;
+        }
+
+        /* DATA SPINE (Debajo de cámara) */
+        .spine {
+            position: absolute;
+            top: 1050px;
+            left: 30px;
+            width: 300px;
+        }
+
+        .data-row {
+            margin-bottom: 20px;
+            border-left: 2px solid var(--cyan-dim);
+            padding-left: 10px;
+        }
+
+        .d-val {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+
+        .d-lbl {
+            font-size: 0.9rem;
+            color: rgba(0, 243, 255, 0.5);
+        }
+
+        /* Columna HEX Derecha (Sacrificable) */
+        .hex-rain {
+            position: absolute;
+            top: 10%;
+            bottom: 10%;
+            right: 10px;
+            font-size: 10px;
+            line-height: 12px;
+            color: rgba(0, 243, 255, 0.2);
+            text-align: right;
+            width: 50px;
+            overflow: hidden;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: 0.3
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="tactical-grid"></div>
+    <div id="debris-layer"></div>
+    <div class="hex-rain" id="hex"></div>
+
+    <div class="status-stack">
+        <div class="status-badge st-live">STREAMING</div>
+        <div class="status-badge st-rec">● REC</div>
+    </div>
+
+    <!-- This frame is just visual overlay, the video sits elsewhere in the host via 'layers' -->
+    <!-- However, we want this overlay to MATCH the video position in Scenes.json -->
+    <!-- But here this is a full-screen overlay (1080x1920) -->
+    <!-- The HOST composes LAYERS. -->
+    <!-- If we put 'hangar-hud.html' as a layer, it covers the whole screen. -->
+    <!-- The Camera video is ANOTHER layer. -->
+    <!-- So, in scenes.json, we must align the video layer to match .camera-frame top/left/width/height here. -->
+    <!-- Here: top 530px, left 30px, width 860px, height 484px. -->
+    <!-- 530/1920 = 27.6%, 30/1080=2.7%, 860/1080=79.6%, 484/1920=25.2% -->
+
+    <div class="camera-frame">
+        <div class="c-corner cc-tl"></div>
+        <div class="c-corner cc-tr"></div>
+        <div class="c-corner cc-bl"></div>
+        <div class="c-corner cc-br"></div>
+
+        <div class="cam-id">
+            HAN<span class="glitch-char">G</span>AR <span class="glitch-char">8</span>9
+        </div>
+    </div>
+
+    <div class="spine">
+        <div class="data-row">
+            <div class="d-lbl">SYS_TIME</div>
+            <div class="d-val" id="clock">00:00</div>
+        </div>
+        <div class="data-row">
+            <div class="d-lbl">INTEGRITY</div>
+            <div class="d-val" style="color:var(--cyan)">98<span class="severe-glitch">%</span></div>
+        </div>
+    </div>
+
+    <script>
+        // 1. Reloj
+        setInterval(() => {
+            const d = new Date();
+            document.getElementById('clock').innerText = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        }, 1000);
+
+        // 2. Hex Rain
+        const hexDiv = document.getElementById('hex');
+        function rain() {
+            let s = '';
+            for (let i = 0; i < 60; i++) s += (Math.random() > 0.5 ? '1' : '0') + 'X' + Math.floor(Math.random() * 99) + '<br>';
+            hexDiv.innerHTML = s;
+        }
+        setInterval(rain, 200);
+
+        // 3. GENERADOR DE BASURA ESPACIAL (DEBRIS)
+        const debrisLayer = document.getElementById('debris-layer');
+        const trashTexts = ['ERR_01', 'NULL', '0x4F', ':::', '///', 'NO_SIGNAL', 'PKT_LOSS', '+', '└', 'top-left'];
+
+        function spawnDebris() {
+            debrisLayer.innerHTML = '';
+            for (let i = 0; i < 25; i++) {
+                const el = document.createElement('div');
+                if (Math.random() > 0.3) {
+                    el.className = 'junk-data';
+                    el.innerText = trashTexts[Math.floor(Math.random() * trashTexts.length)];
+                    if (Math.random() > 0.8) el.classList.add('glitch-char');
+                } else {
+                    el.className = 'tiny-cross';
+                }
+                const x = Math.random() * 1000;
+                const y = Math.random() * 1900;
+                let finalY = y;
+                if (y < 350) finalY = y + 1000;
+
+                el.style.left = x + 'px';
+                el.style.top = finalY + 'px';
+                el.style.opacity = (Math.random() * 0.4 + 0.1);
+
+                debrisLayer.appendChild(el);
+            }
+        }
+        setInterval(spawnDebris, 4000);
+        spawnDebris();
+    </script>
+</body>
+
+</html>
