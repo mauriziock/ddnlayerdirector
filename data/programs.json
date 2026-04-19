@@ -85,5 +85,42 @@
         "value": "alert"
       }
     ]
+  },
+  "hangar-standard": {
+    "id": "hangar-standard",
+    "name": "Hangar Standard Package",
+    "description": "Plantilla base con Bridge integrado y diseño minimalista.",
+    "layers_template": [
+      {
+        "id": "hud_main",
+        "type": "web_source",
+        "url": "/packages/standard/index.html",
+        "z_index": 100,
+        "position": {
+          "x": 0,
+          "y": 0,
+          "width": 100,
+          "height": 100
+        }
+      }
+    ],
+    "triggers": [
+      {
+        "id": "idle",
+        "name": "Modo Reposo",
+        "action": "class_toggle",
+        "target": "body",
+        "value": "state-idle"
+      },
+      {
+        "id": "alert",
+        "name": "Lanzar Alerta",
+        "action": "trigger",
+        "target": "body",
+        "value": "alert"
+      }
+    ],
+    "is_package": true,
+    "installed_at": "2026-01-27T20:39:18.622Z"
   }
 }

@@ -9,7 +9,7 @@
     "state": {
       "idle": false,
       "warning": false,
-      "critical": true
+      "critical": false
     },
     "active_scene": "default",
     "scenes": {
@@ -30,7 +30,8 @@
             "rotation": 0,
             "opacity": 1,
             "volume": 1,
-            "locked": true
+            "locked": true,
+            "visible": true
           },
           {
             "id": "hud_main",
@@ -40,65 +41,173 @@
             "position": {
               "x": 0,
               "y": 0,
-              "width": 100,
-              "height": 100
+              "width": 88.95027624309392,
+              "height": 80.48780487804879
             },
             "opacity": 1,
             "visible": true,
             "rotation": 0,
             "volume": 1,
-            "locked": true
+            "locked": false
           }
         ]
       }
     }
   },
-  "vertical": {
-    "id": "vertical",
-    "name": "Vertical",
+  "tiktok": {
+    "id": "tiktok",
+    "name": "Tiktok",
     "width": 720,
     "height": 1280,
     "type": "vertical",
-    "program_id": "stark_hud",
+    "program_id": "default_program",
     "state": {
-      "idle": false,
-      "warning": false,
-      "critical": false
+      "live": false,
+      "brb": false
     },
     "active_scene": "default",
     "scenes": {
       "default": {
-        "layers": []
+        "layers": [
+          {
+            "id": "tetxto",
+            "type": "text_source",
+            "z_index": 10,
+            "position": {
+              "x": 26.519337016574585,
+              "y": 42.05607476635514,
+              "width": 43.370165745856355,
+              "height": 26.323987538940806
+            },
+            "muted": false,
+            "content": "TEXTO",
+            "rotation": 0,
+            "opacity": 1,
+            "volume": 1,
+            "locked": true
+          },
+          {
+            "id": "musica",
+            "type": "webrtc_audio",
+            "z_index": 14,
+            "position": {
+              "x": 10,
+              "y": 10,
+              "width": 50,
+              "height": 30
+            },
+            "muted": false,
+            "source_id": "musica",
+            "rotation": 0,
+            "opacity": 0.24,
+            "volume": 1
+          },
+          {
+            "id": "microfono",
+            "type": "webrtc_audio",
+            "z_index": 15,
+            "position": {
+              "x": 10,
+              "y": 10,
+              "width": 50,
+              "height": 30
+            },
+            "muted": false,
+            "source_id": "microfono",
+            "rotation": 0,
+            "opacity": 1,
+            "volume": 0.27
+          },
+          {
+            "id": "overlay",
+            "type": "web_source",
+            "z_index": 20,
+            "position": {
+              "x": 0,
+              "y": 0,
+              "width": 100,
+              "height": 100
+            },
+            "muted": false,
+            "url": "overlays/hangar2.html",
+            "rotation": 0,
+            "opacity": 1,
+            "volume": 1,
+            "locked": true
+          },
+          {
+            "id": "reproductori",
+            "type": "web_source",
+            "z_index": 30,
+            "position": {
+              "x": 5.524861878453039,
+              "y": 10.74766355140187,
+              "width": 87.01657458563537,
+              "height": 15.264797507788161
+            },
+            "muted": false,
+            "url": "/overlays/nowplaying.html",
+            "rotation": 0,
+            "opacity": 1,
+            "volume": 1,
+            "locked": true,
+            "visible": true
+          },
+          {
+            "id": "canara_web",
+            "type": "srt_video",
+            "z_index": 40,
+            "position": {
+              "x": 9.94475138121547,
+              "y": 31.15264797507788,
+              "width": 78.72928176795581,
+              "height": 24.143302180685357
+            },
+            "muted": false,
+            "source_id": "s25",
+            "rotation": 0,
+            "opacity": 0.19,
+            "volume": 1,
+            "locked": false,
+            "visible": true
+          }
+        ]
       }
     }
   },
-  "landscape": {
-    "id": "landscape",
-    "name": "Landscape",
-    "width": 1280,
-    "height": 720,
+  "twitch_radio": {
+    "id": "twitch_radio",
+    "name": "TwitchRadio",
+    "width": 1920,
+    "height": 1080,
     "type": "landscape",
-    "program_id": "stark_hud",
-    "state": {},
+    "program_id": "default_program",
+    "state": {
+      "live": false,
+      "brb": false
+    },
     "active_scene": "default",
     "scenes": {
       "default": {
-        "layers": []
-      }
-    }
-  },
-  "ejemplooo": {
-    "id": "ejemplooo",
-    "name": "ejemplo",
-    "width": 720,
-    "height": 1280,
-    "type": "vertical",
-    "program_id": "demo",
-    "state": {},
-    "active_scene": "default",
-    "scenes": {
-      "default": {
-        "layers": []
+        "layers": [
+          {
+            "id": "overlay_twitch",
+            "type": "web_source",
+            "z_index": 10,
+            "position": {
+              "x": 0,
+              "y": 0,
+              "width": 100,
+              "height": 100
+            },
+            "muted": false,
+            "url": "overlays/overlay_exp33.html",
+            "rotation": 0,
+            "opacity": 1,
+            "volume": 1,
+            "locked": true
+          }
+        ]
       }
     }
   }

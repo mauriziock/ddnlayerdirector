@@ -518,61 +518,231 @@
             }
         }
 
-        /* --- 4. ESTRUCTURA PRINCIPAL (REPOSITIVA) --- */
-
-        /* STATUS STACK: Top center, clean for TikTok profile area */
-        .status-stack {
+        /* --- 4. RADIO CONSOLE STRUCTURE --- */
+        .main-console {
             position: absolute;
-            bottom: 40px;
-            /* Subido un poco más para no tapar el borde */
-            right: 15px;
-            display: flex;
-            gap: 10px;
-            z-index: 20;
-        }
-
-        .status-badge {
-            font-size: 0.9rem;
-            letter-spacing: 2px;
-            padding: 4px 12px;
-            border: 2px solid;
-            background: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(5px);
-        }
-
-        .st-rec {
-            border-color: var(--red);
-            color: var(--red);
-            animation: pulse 1s infinite;
-        }
-
-        .st-live {
-            border-color: var(--cyan);
-            color: var(--cyan);
-        }
-
-        /* CAMERA FRAME: Integrated in safe zone */
-        .camera-frame {
-            position: absolute;
-            top: 25vh;
-            /* Espacio para el reproductor */
-            left: 5vw;
-            width: 90vw;
-            aspect-ratio: 9 / 16;
-            border: 1px solid rgba(0, 243, 255, 0.2);
-            box-shadow: inset 0 0 50px rgba(0, 243, 255, 0.05);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 96vw;
+            height: 92vh;
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            grid-template-rows: auto 1fr auto;
+            gap: 20px;
             z-index: 10;
         }
 
-        /* Esquinas técnicas */
-        .c-corner {
-            position: absolute;
-            width: 15px;
-            height: 15px;
-            border-color: var(--cyan);
-            border-style: solid;
+        /* Branding Header */
+        .console-header {
+            grid-column: 1 / -1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--cyan-dim);
+            padding: 10px 0;
+            background: linear-gradient(to right, rgba(0, 243, 255, 0.05), transparent);
         }
 
+        .branding-group {
+            display: flex;
+            align-items: baseline;
+            gap: 20px;
+        }
+
+        .station-title {
+            font-size: 2.5rem;
+            font-weight: 900;
+            letter-spacing: -2px;
+            text-shadow: 0 0 20px var(--cyan);
+            color: var(--cyan);
+        }
+
+        .sub-brand {
+            font-size: 1.2rem;
+            color: var(--purple);
+            border: 1px solid var(--purple);
+            padding: 2px 10px;
+            background: var(--purple-dim);
+        }
+
+        .frequency-tag {
+            font-size: 1.2rem;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 5px 15px;
+            border-left: 4px solid var(--red);
+            color: var(--red);
+            font-weight: bold;
+        }
+
+        /* Player Slot & Metadata */
+        .player-slot {
+            position: relative;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid var(--cyan-dim);
+            display: flex;
+            align-items: center;
+            padding: 40px;
+            gap: 30px;
+            overflow: hidden;
+            backdrop-filter: blur(15px);
+            box-shadow: inset 0 0 100px rgba(0, 243, 255, 0.05);
+        }
+
+        .art-container {
+            width: 180px;
+            height: 180px;
+            border: 1px solid var(--cyan);
+            padding: 5px;
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.2);
+            background: #000;
+            flex-shrink: 0;
+            z-index: 5;
+        }
+
+        #art {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0.8;
+        }
+
+        .metadata {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 5;
+            flex-grow: 1;
+        }
+
+        .track-name {
+            font-size: 2.2rem;
+            font-weight: 900;
+            color: #fff;
+            text-shadow: 0 0 15px rgba(255, 255, 255, 0.4);
+            letter-spacing: -1px;
+        }
+
+        .artist-name {
+            font-size: 1.2rem;
+            color: var(--cyan);
+            letter-spacing: 4px;
+            font-weight: bold;
+            opacity: 0.8;
+        }
+
+        /* Stream Animation (Avicii style) */
+        .viz-container {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 60px;
+            overflow: hidden;
+            opacity: 0.4;
+            pointer-events: none;
+        }
+
+        .stream-line {
+            position: absolute;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--cyan), var(--purple), transparent);
+            width: 100%;
+            filter: blur(1px);
+        }
+
+        .l1 {
+            animation: stream-anim 2s infinite linear;
+            bottom: 10px;
+            opacity: 0.8;
+        }
+
+        .l2 {
+            animation: stream-anim 4s infinite linear reverse;
+            bottom: 25px;
+            opacity: 0.4;
+        }
+
+        .l3 {
+            animation: stream-anim 1.5s infinite linear;
+            bottom: 40px;
+            opacity: 0.6;
+            height: 1px;
+        }
+
+        @keyframes stream-anim {
+            0% {
+                transform: translateX(-100%);
+            }
+
+            100% {
+                transform: translateX(100%);
+            }
+        }
+
+        /* Terminal Style for AI Facts */
+        .terminal-block {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.4);
+            border-left: 2px solid var(--accent);
+            min-height: 100px;
+            font-size: 0.9rem;
+            line-height: 1.4;
+            color: rgba(0, 243, 255, 0.8);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .terminal-block::before {
+            content: 'AI_ANALYST_v2.0';
+            display: block;
+            font-size: 0.6rem;
+            color: var(--accent);
+            opacity: 0.5;
+            margin-bottom: 5px;
+        }
+
+        .typewriter-cursor {
+            display: inline-block;
+            width: 8px;
+            height: 15px;
+            background: var(--accent);
+            margin-left: 5px;
+            animation: blink 0.8s infinite;
+            vertical-align: middle;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0;
+            }
+        }
+
+        /* Side Panel: Camera and Stats */
+        .side-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow: hidden;
+        }
+
+        .camera-frame {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            border: 1px solid rgba(0, 243, 255, 0.5);
+            background: rgba(0, 0, 0, 0.8);
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.1);
+        }
+
+        /* Reuse corners for camera-frame */
         .cc-tl {
             top: -1px;
             left: -1px;
@@ -599,61 +769,146 @@
 
         .cam-id {
             position: absolute;
-            top: 10px;
-            left: 10px;
+            top: 5px;
+            left: 5px;
             color: var(--cyan);
             font-weight: 800;
-            padding: 5px 10px;
-            font-size: 1.8rem;
-            /* Reducido de 2.5rem */
-            text-shadow: 0 0 10px var(--cyan);
+            padding: 2px 5px;
+            font-size: 1rem;
+            text-shadow: 0 0 5px var(--cyan);
+            z-index: 15;
+            background: rgba(0, 0, 0, 0.4);
         }
 
         .cam-overlay-info {
             position: absolute;
-            top: 50px;
-            /* Subido de 70px */
-            left: 15px;
+            bottom: 5px;
+            left: 5px;
             display: flex;
             flex-direction: column;
-            gap: 3px;
+            gap: 2px;
+            z-index: 15;
+        }
+
+        .status-stack {
+            display: flex;
+            gap: 5px;
+            z-index: 20;
         }
 
         .cam-name {
-            font-size: 0.9rem;
-            /* Reducido de 1.2rem */
+            font-size: 0.6rem;
             background: var(--cyan);
             color: #000;
-            padding: 2px 8px;
+            padding: 1px 4px;
             width: fit-content;
         }
 
         .cam-time-block {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 5px;
             background: rgba(0, 0, 0, 0.7);
-            padding: 3px 8px;
-            border-left: 3px solid var(--red);
-            font-size: 0.8rem;
-            /* Añadido tamaño de fuente */
+            padding: 2px 5px;
+            border-left: 2px solid var(--red);
+            font-size: 0.6rem;
         }
 
         .rec-dot {
-            width: 12px;
-            height: 12px;
+            width: 8px;
+            height: 8px;
             background: var(--red);
             border-radius: 50%;
             animation: pulse 1s infinite;
         }
 
-        /* DATA SPINE (Debajo de cámara) */
-        .spine {
+        /* Visualizer */
+        .visualizer-container {
+            display: flex;
+            align-items: flex-end;
+            gap: 4px;
+            height: 60px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--cyan-dim);
+            box-shadow: inset 0 0 15px rgba(0, 243, 255, 0.1);
+        }
+
+        .vis-bar {
+            flex: 1;
+            background: var(--cyan);
+            animation: bar-surge 0.5s infinite alternate ease-in-out;
+            box-shadow: 0 0 10px var(--cyan);
+        }
+
+        /* FM Tuner Bar */
+        .tuner-container {
+            grid-column: 1 / -1;
+            height: 30px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid var(--purple-dim);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            font-size: 0.7rem;
+            color: var(--purple);
+            letter-spacing: 2px;
+        }
+
+        .tuner-line {
             position: absolute;
-            top: 55vh;
-            /* Debajo del frame de la cámara */
-            left: 5vw;
-            width: 60vw;
+            top: 0;
+            left: 50%;
+            width: 2px;
+            height: 100%;
+            background: var(--red);
+            box-shadow: 0 0 10px var(--red);
+            z-index: 5;
+            animation: tuner-drift 10s infinite alternate ease-in-out;
+        }
+
+        .tuner-marks {
+            width: 200%;
+            height: 100%;
+            background-image: linear-gradient(to right, var(--purple-dim) 1px, transparent 1px);
+            background-size: 20px 100%;
+            opacity: 0.5;
+        }
+
+        @keyframes tuner-drift {
+            from {
+                left: 40%;
+            }
+
+            to {
+                left: 60%;
+            }
+        }
+
+        @keyframes bar-surge {
+            0% {
+                height: 20%;
+                opacity: 0.4;
+            }
+
+            50% {
+                height: 80%;
+                opacity: 0.8;
+            }
+
+            100% {
+                height: 40%;
+                opacity: 0.6;
+            }
+        }
+
+        /* SPINE and Status in console layout */
+        .spine {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
         }
 
         .data-row {
@@ -792,41 +1047,103 @@
     <div id="debris-layer"></div>
     <div class="hex-rain" id="hex"></div>
 
-
-
-    <div class="camera-frame">
-        <div class="c-corner cc-tl"></div>
-        <div class="c-corner cc-tr"></div>
-        <div class="c-corner cc-bl"></div>
-        <div class="c-corner cc-br"></div>
-
-        <div class="cam-id glitch-text" data-text="DDN MX">
-            DDN MX
-        </div>
-
-        <div class="cam-overlay-info">
-            <div class="cam-name">HANGAR CAM 02</div>
-            <div class="cam-time-block">
-                <div class="rec-dot"></div>
-                <div id="clock">00:00:00</div>
+    <div class="main-console">
+        <!-- Header: Branding and Frequency -->
+        <header class="console-header">
+            <div class="branding-group">
+                <div class="station-title glitch-text" data-text="DRIFTERS DEN">DRIFTERS DEN</div>
+                <div class="sub-brand glitch-text" data-text="DDN MX">DDN MX</div>
             </div>
-        </div>
+            <div class="frequency-tag">89.0 MHz DRIFT</div>
+        </header>
 
-        <div class="status-stack">
-            <div class="status-badge st-live">LIVE_MESH</div>
-            <div class="status-badge st-rec">● EN VIVO</div>
-        </div>
-    </div>
+        <!-- Left: Radio Player -->
+        <main class="player-slot">
+            <div class="art-container">
+                <img id="art" src="" alt="Album Art">
+            </div>
 
-    <div class="spine">
-        <div class="data-row">
-            <div class="d-lbl">BITRATE</div>
-            <div class="d-val severe-glitch">9.4 MBPS</div>
-        </div>
-        <div class="data-row">
-            <div class="d-lbl">SIGNAL_STRENGTH</div>
-            <div class="d-val" style="color:var(--cyan)">CRITICAL<span class="severe-glitch">!!!</span></div>
-        </div>
+            <div class="metadata">
+                <div id="track" class="track-name">SISTEMA INICIADO</div>
+                <div id="artist" class="artist-name">ESPERANDO SEÑAL...</div>
+
+                <div class="live-tag"
+                    style="position: relative; top: 10px; border: 1px solid var(--red); width: fit-content; padding: 2px 8px; color: var(--red); font-size: 0.7rem; letter-spacing: 2px;">
+                    <span class="rec-dot"
+                        style="display: inline-block; vertical-align: middle; margin-right: 5px;"></span>
+                    STREAM_CONNECTED
+                </div>
+
+                <div class="terminal-block">
+                    <div id="ai-facts">ESPERANDO ANÁLISIS SÓNICO...</div>
+                    <span id="ai-cursor" class="typewriter-cursor"></span>
+                </div>
+            </div>
+
+            <!-- Stream Animations -->
+            <div class="viz-container">
+                <div class="stream-line l1"></div>
+                <div class="stream-line l2"></div>
+                <div class="stream-line l3"></div>
+            </div>
+        </main>
+
+        <!-- Right: Camera and Stats -->
+        <aside class="side-panel">
+            <div class="camera-frame">
+                <div class="c-corner cc-tl"></div>
+                <div class="c-corner cc-tr"></div>
+                <div class="c-corner cc-bl"></div>
+                <div class="c-corner cc-br"></div>
+
+                <div class="cam-id">HANGAR CAM 02</div>
+
+                <div class="cam-overlay-info">
+                    <div class="cam-name">HANGAR CAM 02</div>
+                    <div class="cam-time-block">
+                        <div class="rec-dot"></div>
+                        <div id="clock">00:00:00</div>
+                    </div>
+                </div>
+
+                <div class="status-stack" style="position: absolute; top: 5px; right: 5px; bottom: auto;">
+                    <div class="status-badge st-live" style="font-size: 0.5rem; padding: 2px 6px;">LIVE_MESH</div>
+                </div>
+            </div>
+
+            <div class="visualizer-container" id="visualizer">
+                <!-- Bars generated by script or static -->
+                <div class="vis-bar" style="animation-delay: 0.1s"></div>
+                <div class="vis-bar" style="animation-delay: 0.3s"></div>
+                <div class="vis-bar" style="animation-delay: 0.2s"></div>
+                <div class="vis-bar" style="animation-delay: 0.5s"></div>
+                <div class="vis-bar" style="animation-delay: 0.4s"></div>
+                <div class="vis-bar" style="animation-delay: 0.6s"></div>
+                <div class="vis-bar" style="animation-delay: 0.2s"></div>
+            </div>
+
+            <div class="spine">
+                <div class="data-row">
+                    <div class="d-lbl">BITRATE</div>
+                    <div class="d-val severe-glitch" style="font-size: 1rem;">9.4 MBPS</div>
+                </div>
+                <div class="data-row">
+                    <div class="d-lbl">SIGNAL</div>
+                    <div class="d-val" style="color:var(--cyan); font-size: 1rem;">STABLE</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Bottom: Tuner Bar -->
+        <footer class="tuner-container">
+            <div class="tuner-line"></div>
+            <div class="tuner-marks"></div>
+            <div style="position: absolute; left: 10px;">88.0</div>
+            <div style="position: absolute; left: 25%;">92.5</div>
+            <div style="position: absolute; left: 50%; color: var(--cyan); font-weight: bold;">89.0 DRIFT</div>
+            <div style="position: absolute; left: 75%;">102.1</div>
+            <div style="position: absolute; right: 10px;">108.0</div>
+        </footer>
     </div>
 
     <script>
@@ -882,7 +1199,96 @@
 
         setInterval(spawnDebris, 4000);
         spawnDebris();
+
+        // 4. LAST.FM NOW PLAYING LOGIC
+        const LASTFM_CONFIG = {
+            apiKey: '3c93be4fddcf1fef5e080971b8115cd9',
+            user: 'mauriziock',
+            pollInterval: 5000
+        };
+
+        const playerElements = {
+            art: document.getElementById('art'),
+            track: document.getElementById('track'),
+            artist: document.getElementById('artist')
+        };
+
+        let lastTrackTitle = '';
+
+        async function updateRadioPlayer() {
+            try {
+                // Fetch config first to get user
+                const configRes = await fetch('/api/config');
+                const config = await configRes.json();
+                const user = config.lastfmUser || LASTFM_CONFIG.user;
+
+                const response = await fetch(`https://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user=${user}&api_key=${LASTFM_CONFIG.apiKey}&format=json&limit=1`);
+                const data = await response.json();
+
+                if (!data.recenttracks || !data.recenttracks.track.length) return;
+
+                const track = data.recenttracks.track[0];
+                const isPlaying = (track['@attr'] && track['@attr'].nowplaying === 'true');
+
+                if (isPlaying) {
+                    const title = track.name;
+                    const artist = track.artist['#text'];
+                    const img = track.image[3]['#text'] || track.image[2]['#text'];
+
+                    if (lastTrackTitle !== title) {
+                        lastTrackTitle = title;
+                        playerElements.track.textContent = title;
+                        playerElements.artist.textContent = artist;
+                        if (img) playerElements.art.src = img;
+
+                        // NEW: Fetch AI Facts
+                        fetchAIFacts(artist, title);
+                    }
+                }
+            } catch (err) {
+                console.error("Radio Player Error:", err);
+            }
+        }
+
+        async function fetchAIFacts(artist, track) {
+            const aiText = document.getElementById('ai-facts');
+            aiText.textContent = '> ANALIZANDO SEÑAL...';
+            try {
+                const res = await fetch(`/api/track-info?artist=${encodeURIComponent(artist)}&track=${encodeURIComponent(track)}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    const factsText = data.facts.join(' | ');
+                    typewriter(factsText, 'ai-facts');
+                } else {
+                    const err = await res.json();
+                    aiText.textContent = `> ERROR: ${err.error || 'AI_OFFLINE'}`;
+                    console.error("AI Error Response:", err);
+                }
+            } catch (e) {
+                aiText.textContent = '> ERROR: CONNECTION_LOST';
+                console.error("AI Fetch error:", e);
+            }
+        }
+
+        function typewriter(text, elementId) {
+            const el = document.getElementById(elementId);
+            el.textContent = '> ';
+            let i = 0;
+            const speed = 40;
+
+            function type() {
+                if (i < text.length) {
+                    el.textContent += text.charAt(i);
+                    i++;
+                    setTimeout(type, speed);
+                }
+            }
+            type();
+        }
+
+        setInterval(updateRadioPlayer, LASTFM_CONFIG.pollInterval);
+        updateRadioPlayer();
     </script>
 </body>
 
-</html> 
+</html>

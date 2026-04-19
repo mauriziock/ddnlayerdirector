@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Hangar Settings</title>
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0a0b;
+            --card-bg: rgba(255, 255, 255, 0.05);
+            --accent: #00f3ff;
+            --purple: #b537f2;
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            background: var(--bg);
+            color: #eee;
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0;
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Nav reuse */
+        nav.global-nav {
+            width: 70px;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px 0;
+        }
+
+        .nav-item {
+            width: 45px;
+            height: 45px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: rgba(255, 255, 255, 0.05);
+            color: #666;
+            text-decoration: none;
+        }
+
+        .nav-item:hover,
+        .nav-item.active {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--accent);
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
+        }
+
+        .nav-item svg {
+            width: 22px;
+            height: 22px;
+            fill: currentColor;
+        }
+
+        .main-content {
+            flex-grow: 1;
+            padding: 40px;
+            overflow-y: auto;
+        }
+
+        .settings-grid {
+            max-width: 800px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+
+        .section-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+        }
+
+        .section-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--accent);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.85rem;
+            color: #888;
+            margin-bottom: 8px;
+        }
+
+        input {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            color: #fff;
+            font-family: inherit;
+            box-sizing: border-box;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 10px rgba(0, 243, 255, 0.1);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: #000;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        button:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            margin-left: 10px;
+        }
+
+        .status-ok {
+            background: rgba(0, 255, 0, 0.1);
+            color: #0f0;
+        }
+
+        .status-err {
+            background: rgba(255, 0, 0, 0.1);
+            color: #f00;
+        }
+
+        /* Terminal Style */
+        .terminal-log {
+            margin-top: 30px;
+            background: #000;
+            border: 1px solid #333;
+            border-radius: 8px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: 'Share Tech Mono', monospace;
+            padding: 15px;
+            font-size: 0.8rem;
+            color: #0f0;
+            box-shadow: inset 0 0 20px rgba(0, 255, 0, 0.05);
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            border-bottom: 1px solid #111;
+            padding-bottom: 2px;
+        }
+
+        .log-time {
+            color: #555;
+            margin-right: 10px;
+        }
+
+        .log-type-error {
+            color: #f00;
+        }
+
+        .log-type-info {
+            color: #00f3ff;
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+
+<body>
+    <nav class="global-nav">
+        <a href="/admin.html" class="nav-item" title="Director">
+            <svg viewBox="0 0 24 24">
+                <path d="M10,20V14H14V20H19V12H22L12,3L2,12H5V20H10Z" />
+            </svg>
+        </a>
+        <a href="/programs.html" class="nav-item" title="Programs">
+            <svg viewBox="0 0 24 24">
+                <path
+                    d="M12,18.54L19.37,12.8L21,14.07L12,21.07L3,14.07L4.62,12.81L12,18.54M12,16L3,9L12,2L21,9L12,16Z" />
+            </svg>
+        </a>
+        <a href="/devices.html" class="nav-item" title="Devices Hub">
+            <svg viewBox="0 0 24 24">
+                <path
+                    d="M4,6H20V16H4M20,18A2,2 0 0,0 22,16V6C22,4.89 21.1,4 20,4H4C2.89,4 2,4.89 2,6V16A2,2 0 0,0 4,18H0V20H24V18H20Z" />
+            </svg>
+        </a>
+        <a href="/settings.html" class="nav-item active" title="Settings">
+            <svg viewBox="0 0 24 24">
+                <path
+                    d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.35 19.43,11.03L21.54,9.37C21.73,9.22 21.78,8.97 21.64,8.73L19.64,5.27C19.5,5.04 19.25,4.95 19.03,5.03L16.54,6.03C16.03,5.64 15.47,5.31 14.88,5.08L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.12,5.08C8.53,5.31 7.97,5.64 7.46,6.03L4.97,5.03C4.75,4.95 4.5,5.04 4.36,5.27L2.36,8.73C2.22,8.97 2.27,9.22 2.46,9.37L4.57,11.03C4.53,11.35 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.22,15.03 2.36,15.27L4.36,18.73C4.5,18.96 4.75,19.05 4.97,18.97L7.46,17.97C7.97,18.36 8.53,18.69 9.12,18.92L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.88,18.92C15.47,18.69 16.03,18.36 16.54,17.97L19.03,18.97C19.25,19.05 19.5,18.96 19.64,18.73L21.64,15.27C21.78,15.03 21.73,14.78 21.54,14.63L19.43,12.97Z" />
+            </svg>
+        </a>
+    </nav>
+
+    <main class="main-content">
+        <h1>Settings & APIs</h1>
+
+        <div class="settings-grid">
+            <!-- OpenRouter Section -->
+            <div class="section-card">
+                <div class="section-title">
+                    <svg style="width:24px;height:24px" viewBox="0 0 24 24">
+                        <path fill="currentColor"
+                            d="M13,9V3.5L18.5,9M6,2C4.89,2 4,2.89 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2H6Z" />
+                    </svg>
+                    AI RADIO ASSISTANT (OpenRouter)
+                    <span id="openrouter-status" class="status-badge status-err">UNCONFIGURED</span>
+                </div>
+
+                <div
+                    style="margin-bottom: 20px; padding: 15px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between;">
+                    <div>
+                        <div id="bot-power-label" style="font-weight: bold; color: #fff;">BOT STATE: <span
+                                id="bot-state-text" style="color: #f00;">OFFLINE</span></div>
+                        <div style="font-size: 0.7rem; color: #666;">Model: openai/gpt-oss-120b</div>
+                    </div>
+                    <div class="btn-group" style="margin: 0;">
+                        <button id="btn-bot-start" class="btn-primary" style="background: #0f0; padding: 5px 15px;"
+                            onclick="toggleBot(true)">START</button>
+                        <button id="btn-bot-stop" class="btn-secondary" style="background: #f00; padding: 5px 15px;"
+                            onclick="toggleBot(false)">STOP</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>API KEY <span id="env-hint" style="color: var(--accent); font-size: 0.7rem; display: none;">(Managed by .env)</span></label>
+                    <input type="password" id="openrouter-key" placeholder="sk-or-v1-...">
+                </div>
+                <div class="btn-group">
+                    <button class="btn-primary" onclick="saveSettings()">SAVE</button>
+                    <button class="btn-secondary" onclick="testConnection('openrouter')">VERIFY</button>
+                </div>
+            </div>
+
+            <!-- Last.fm Section -->
+            <div class="section-card">
+                <div class="section-title">
+                    <svg style="width:24px;height:24px" viewBox="0 0 24 24">
+                        <path fill="currentColor"
+                            d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20M12,6A6,6 0 0,0 6,12A6,6 0 0,0 12,18A6,6 0 0,0 18,12A6,6 0 0,0 12,6M12,16A4,4 0 0,1 8,12A4,4 0 0,1 12,8A4,4 0 0,1 16,12A4,4 0 0,1 12,16Z" />
+                    </svg>
+                    MUSIC TRACKING (Last.fm)
+                    <span id="lastfm-status" class="status-badge status-ok">CONNECTED</span>
+                </div>
+                <div class="form-group">
+                    <label>USERNAME</label>
+                    <input type="text" id="lastfm-user" value="mauriziock">
+                </div>
+                <div class="btn-group">
+                    <button class="btn-primary" onclick="saveSettings()">SAVE</button>
+                    <button class="btn-secondary" onclick="testConnection('lastfm')">VERIFY</button>
+                </div>
+            </div>
+
+            <!-- Bot Logs Terminal -->
+            <div class="section-card">
+                <div class="section-title">
+                    <svg style="width:24px;height:24px" viewBox="0 0 24 24">
+                        <path fill="currentColor"
+                            d="M20,19V7H4V19H20M20,5A2,2 0 0,1 22,7V19A2,2 0 0,1 20,21H4A2,2 0 0,1 2,19V7A2,2 0 0,1 4,5H20M13,17H11V15H13V17M13,13H11V7H13V13Z" />
+                    </svg>
+                    BOT ANALYST LOGS
+                </div>
+                <div id="log-terminal" class="terminal-log">
+                    <div class="log-entry"><span class="log-time">[SISTEMA]</span> <span class="log-msg">Iniciando
+                            terminal de logs...</span></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        async function loadSettings() {
+            try {
+                const res = await fetch('/api/config');
+                const data = await res.json();
+                document.getElementById('openrouter-key').value = data.openrouterKey || '';
+                document.getElementById('lastfm-user').value = data.lastfmUser || 'mauriziock';
+                
+                // Show env hint if the key exists (ideally we should have an indicator from the server)
+                // For now, if it's filled and we are in this flow, we show it
+                if (data.openrouterKey) {
+                    document.getElementById('env-hint').style.display = 'inline';
+                }
+                
+                updateStatusBadges(data);
+                updateBotUI(data.aiEnabled);
+            } catch (e) { console.error("Error loading config:", e); }
+        }
+
+        function updateBotUI(enabled) {
+            const text = document.getElementById('bot-state-text');
+            const startBtn = document.getElementById('btn-bot-start');
+            const stopBtn = document.getElementById('btn-bot-stop');
+
+            if (enabled) {
+                text.textContent = 'ACTIVE';
+                text.style.color = '#0f0';
+                startBtn.style.opacity = '0.5';
+                startBtn.disabled = true;
+                stopBtn.style.opacity = '1';
+                stopBtn.disabled = false;
+            } else {
+                text.textContent = 'STOPPED';
+                text.style.color = '#f00';
+                startBtn.style.opacity = '1';
+                startBtn.disabled = false;
+                stopBtn.style.opacity = '0.5';
+                stopBtn.disabled = true;
+            }
+        }
+
+        async function toggleBot(enable) {
+            const config = { aiEnabled: enable };
+            try {
+                const res = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                if (res.ok) loadSettings();
+            } catch (e) { alert('Error toggling bot'); }
+        }
+
+        function updateStatusBadges(data) {
+            const orBadge = document.getElementById('openrouter-status');
+            if (data.openrouterKey) {
+                orBadge.textContent = 'CONFIGURED';
+                orBadge.className = 'status-badge status-ok';
+            } else {
+                orBadge.textContent = 'UNCONFIGURED';
+                orBadge.className = 'status-badge status-err';
+            }
+        }
+
+        async function saveSettings() {
+            const config = {
+                openrouterKey: document.getElementById('openrouter-key').value,
+                lastfmUser: document.getElementById('lastfm-user').value
+            };
+            try {
+                const res = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                if (res.ok) {
+                    alert('Settings saved!');
+                    loadSettings();
+                }
+            } catch (e) { alert('Error saving settings'); }
+        }
+
+        async function testConnection(api) {
+            const key = document.getElementById('openrouter-key').value;
+            const user = document.getElementById('lastfm-user').value;
+            try {
+                const res = await fetch('/api/config/test', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ api, key, user })
+                });
+                const result = await res.json();
+                alert(result.success ? 'Connection Successful!' : 'Connection Failed: ' + result.error);
+            } catch (e) { alert('Test failed'); }
+        }
+
+        loadSettings();
+
+        // --- SOCKET LOGS ---
+        const socket = io();
+        const logTerminal = document.getElementById('log-terminal');
+
+        socket.on('bot_log', (log) => {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="log-time">[${log.timestamp}]</span> <span class="log-type-${log.type}">[${log.type.toUpperCase()}]</span> <span class="log-msg">${log.message}</span>`;
+            logTerminal.appendChild(entry);
+            logTerminal.scrollTop = logTerminal.scrollHeight;
+
+            // Limit logs
+            if (logTerminal.children.length > 50) logTerminal.removeChild(logTerminal.firstChild);
+        });
+    </script>
+</body>
+
+</html>

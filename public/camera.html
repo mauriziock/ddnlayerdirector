@@ -148,16 +148,46 @@
 
     <script>
         const socket = io();
+
+        socket.on('connect', () => {
+            // Re-register if we were already set up (server restart recovery)
+            if (currentTarget) {
+                log("Re-connected. Refreshing registration...");
+                if (mySourceId) {
+                    // We had a role, re-claim it?? 
+                    // Ideally we just rejoin the signaling channel.
+                    socket.emit('register', { role: mySourceId, target: currentTarget });
+                } else {
+                    socket.emit('register', { role: 'source_candidate', target: currentTarget });
+                }
+            }
+        });
+
         const debugLog = document.getElementById('debug-log');
+        const roleList = document.getElementById('role-list');
+        const roleOverlay = document.getElementById('role-overlay');
+        const statusText = document.getElementById('status-text');
+        const roleDisplay = document.getElementById('role-display');
+        const previewVideo = document.getElementById('preview');
+
+        window.onerror = function (msg, url, line) {
+            log(`CRITICAL JS ERROR: ${msg} (at ${line})`);
+            if (statusText) statusText.innerText = "JS ERROR: See Log";
+        };
+
         function log(msg) {
             console.log(msg);
             // Send to server for remote debugging
             if (socket && socket.connected) socket.emit('client_log', `[${mySourceId || 'CAM'}]: ${msg}`);
 
-            const line = document.createElement('div');
-            line.innerText = `> ${msg}`;
-            debugLog.insertBefore(line, debugLog.firstChild);
-            if (debugLog.children.length > 20) debugLog.lastChild.remove();
+            if (debugLog) {
+                const line = document.createElement('div');
+                line.style.borderBottom = "1px solid rgba(0,243,255,0.1)";
+                line.style.padding = "2px 0";
+                line.innerHTML = `<span style="color:#666;">[${new Date().toLocaleTimeString()}]</span> ${msg}`;
+                debugLog.insertBefore(line, debugLog.firstChild);
+                if (debugLog.children.length > 50) debugLog.lastChild.remove();
+            }
         }
 
         // State
@@ -167,19 +197,55 @@
         let videoDevices = [];
         let currentDeviceIndex = 0;
         let currentQuality = 'medium'; // Default quality
-
-        const preview = document.getElementById('preview');
-        const statusText = document.getElementById('status-text');
-        const roleList = document.getElementById('role-list');
-        const overlay = document.getElementById('role-overlay');
-        const roleDisplay = document.getElementById('role-display');
-
+        let myDestSocketId = null; // Direct signaling target
         const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
-        // 1. Initial Logic: Register as candidate to get scene
-        socket.emit('register', 'source_candidate');
+        const urlParams = new URLSearchParams(window.location.search);
+        let currentTarget = urlParams.get('target'); // e.g. 'main' or 'tiktok'
+        let isLive = false;
 
-        socket.on('scene_update', (scene) => {
+        // 1. Initial Logic: If target is missing, discover channels
+        if (!currentTarget) {
+            log("No target specified. Discovering channels...");
+            socket.emit('get_channels', (channels) => {
+                roleList.innerHTML = '';
+                if (!channels || channels.length === 0) {
+                    roleList.innerHTML = '<div style="color:#666;">No active channels found.</div>';
+                    return;
+                }
+                channels.forEach(channel => {
+                    const btn = document.createElement('button');
+                    btn.className = 'role-btn';
+                    btn.innerHTML = `
+                        <div>CHANNEL: ${channel.name}</div>
+                        <div class="role-id">ID: ${channel.id}</div>
+                        <div class="role-icon">🌐</div>
+                    `;
+                    btn.onclick = () => {
+                        currentTarget = channel.id;
+                        document.querySelector('#role-overlay h2').innerText = "SELECT CAMERA ROLE";
+                        startRegistration();
+                    };
+                    roleList.appendChild(btn);
+                });
+            });
+        } else {
+            startRegistration();
+        }
+
+        function startRegistration() {
+            log(`Registering on target: ${currentTarget}`);
+            socket.emit('register', { role: 'source_candidate', target: currentTarget });
+        }
+
+        socket.on('scene_update', (data) => {
+            log("Received scene_update from target: " + (data.target || 'unknown'));
+            // New format: { target, scene }
+            const scene = data.scene || data; // Fallback for safety
+            const incomingTarget = (data.target || '').toLowerCase();
+
+            if (currentTarget && incomingTarget !== currentTarget.toLowerCase()) return;
+
             // Check if my layer has config
             if (mySourceId) {
                 const myLayer = scene.layers.find(l => l.source_id === mySourceId);
@@ -190,10 +256,6 @@
                         currentQuality = myLayer.camera_quality;
                         applyQuality();
                     }
-                    // Check Pref (Lens)
-                    if (myLayer.camera_pref) {
-                        // (Logic remains for initial lens selection if needed, but usually we wait for command)
-                    }
                 }
             }
 
@@ -201,10 +263,29 @@
             if (mySourceId) return;
 
             const videoSlots = scene.layers.filter(l => l.type.includes('webrtc_video'));
-            roleList.innerHTML = '';
 
+            // AUTO-JOIN LOGIC: Offer a "START" button for gesture
+            if (videoSlots.length === 1) {
+                log(`Auto-Join candidate found: ${videoSlots[0].id}`);
+                roleList.innerHTML = '';
+                const btn = document.createElement('button');
+                btn.className = 'role-btn';
+                btn.style.background = '#00f3ff';
+                btn.style.color = '#000';
+                btn.style.textAlign = 'center';
+                btn.innerHTML = `
+                    <div style="font-weight:bold; font-size:1.5rem;">START CAMERA</div>
+                    <div class="role-id">Targeting: ${videoSlots[0].id}</div>
+                    <div class="role-icon">⚡</div>
+                `;
+                btn.onclick = () => assignRole(videoSlots[0].source_id);
+                roleList.appendChild(btn);
+                return;
+            }
+
+            roleList.innerHTML = '';
             if (videoSlots.length === 0) {
-                roleList.innerHTML = '<div style="color:#666;">No camera slots available in current scene.</div>';
+                roleList.innerHTML = `<div style="color:#666;">No camera slots available in ${currentTarget}.</div>`;
                 return;
             }
 
@@ -222,14 +303,27 @@
         });
 
         function assignRole(id) {
+            log(`[HANDSHAKE] Step 1: ROL SELECCIONADO (${id}) - PREPARANDO CÁMARA...`);
             mySourceId = id;
-            overlay.style.display = 'none';
+            roleOverlay.style.display = 'none';
             roleDisplay.innerText = id.toUpperCase();
 
-            // Re-register as generic source (or keep candidate, doesn't matter much unless server logic depends on it)
-            // Start Camera & Offer
+            // Iniciar captura inmediatamente
             initCamera();
+
+            // Auto-Start (Source Push)
+            isLive = true;
+            statusText.innerText = "AUTO-STARTING...";
+            statusText.style.color = "yellow";
+            // initCamera -> startStream -> createOffer will handle the rest.
         }
+
+        socket.on('host_online', (data) => {
+            if (isLive && mySourceId) {
+                log("[HANDSHAKE] Host appeared! Resending offer...");
+                createOffer();
+            }
+        });
 
         // Wake Lock
         let wakeLock = null;
@@ -276,6 +370,7 @@
                 // BROADCAST CAPABILITIES
                 await broadcastSourceInfo();
 
+                log(`[HANDSHAKE] Step 2: Permission Granted & Cameras Found (${videoDevices.length})`);
                 startStream(videoDevices[currentDeviceIndex]?.deviceId);
 
             } catch (e) {
@@ -374,6 +469,7 @@
                 log(`Requesting simple constraints...`);
                 localStream = await navigator.mediaDevices.getUserMedia(constraints);
 
+                log("[HANDSHAKE] Step 3: Local Stream Created OK");
                 preview.srcObject = localStream;
                 createOffer();
 
@@ -416,50 +512,61 @@
 
             peerConnection.onicecandidate = (event) => {
                 if (event.candidate) {
-                    socket.emit('candidate', { candidate: event.candidate, target: 'host', from: socket.id });
+                    socket.emit('candidate', {
+                        candidate: event.candidate,
+                        target: `host_${currentTarget}`,
+                        destSocketId: myDestSocketId,
+                        from: socket.id
+                    });
                 }
             };
 
-            const offer = await peerConnection.createOffer();
+            peerConnection.oniceconnectionstatechange = () => {
+                log(`[P2P] ICE State: ${peerConnection.iceConnectionState}`);
+            };
+
+            peerConnection.onconnectionstatechange = () => {
+                if (peerConnection.connectionState === 'connected') {
+                    statusText.innerText = "ONLINE";
+                    statusText.style.color = "#00f3ff";
+                    log("[HANDSHAKE] Step 5: P2P ESTABLECIDO SUCCESSFULLY");
+                } else {
+                    log(`[HANDSHAKE] Connection: ${peerConnection.connectionState}`);
+                }
+            };
+
+            let offer = await peerConnection.createOffer();
+
+            // --- CALIDAD VDO.NINJA HACK (Alta fidelidad en audio si la cámara tiene mic) ---
+            let sdp = offer.sdp;
+            sdp = sdp.replace('useinbandfec=1', 'useinbandfec=1;stereo=1;maxaveragebitrate=510000;cbr=1');
+            offer = new RTCSessionDescription({ type: 'offer', sdp: sdp });
+
             await peerConnection.setLocalDescription(offer);
 
             statusText.innerText = "SIGNALING...";
             statusText.style.color = "yellow";
 
+            log("[HANDSHAKE] Step 3: ENVIANDO OFERTA P2P AL HOST");
             socket.emit('offer', {
                 sdp: offer,
                 type: 'video',
                 from: socket.id,
-                sourceId: mySourceId // Crucial: This tells Host which slot we fill
-            });
-        }
-
-        socket.on('request_offers', () => {
-            if (mySourceId && localStream) {
-                statusText.innerText = "HOST SYNC...";
-                createOffer();
-            }
-            // Always re-broadcast capabilities when requested
-            broadcastSourceInfo();
-        });
-
-        function broadcastSourceInfo() {
-            if (!videoDevices || !mySourceId) {
-                console.warn("Skipping info broadcast", videoDevices?.length, mySourceId);
-                return;
-            }
-            console.log("Broadcasting info for", mySourceId);
-            socket.emit('source_info', {
                 sourceId: mySourceId,
-                devices: videoDevices.map(d => ({ label: d.label, deviceId: d.deviceId }))
+                target: currentTarget,
+                destSocketId: myDestSocketId
             });
         }
+
+        // socket.on('request_offers') eliminado - El control es manual (Push)
 
         socket.on('answer', async (data) => {
             if (peerConnection) {
+                log(`[HANDSHAKE] Step 4: RESPUESTA RECIBIDA - CONECTANDO... (${data.from})`);
+                myDestSocketId = data.from; // Remember who answered
                 await peerConnection.setRemoteDescription(data.sdp);
-                statusText.innerText = "ONLINE";
-                statusText.style.color = "#00f3ff";
+                statusText.innerText = "LINKING...";
+                statusText.style.color = "cyan";
             }
         });
 

@@ -61,11 +61,14 @@
         /* SIDEBAR */
         #sidebar {
             width: 320px;
+            height: 100vh;
             background: #111;
             border-right: 1px solid #000;
             display: flex;
             flex-direction: column;
             flex-shrink: 0;
+            overflow: hidden;
+            box-sizing: border-box;
         }
 
         .header {
@@ -146,7 +149,9 @@
             font-size: 13px;
             color: #bfbfbf;
             user-select: none;
+            gap: 5px;
         }
+
 
         .layer-item:hover {
             background: #333;
@@ -599,6 +604,12 @@
                     d="M4,6H20V16H4M20,18A2,2 0 0,0 22,16V6C22,4.89 21.1,4 20,4H4C2.89,4 2,4.89 2,6V16A2,2 0 0,0 4,18H0V20H24V18H20Z" />
             </svg>
         </a>
+        <a href="/settings.html" class="nav-item" title="Settings">
+            <svg viewBox="0 0 24 24">
+                <path
+                    d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.35 19.43,11.03L21.54,9.37C21.73,9.22 21.78,8.97 21.64,8.73L19.64,5.27C19.5,5.04 19.25,4.95 19.03,5.03L16.54,6.03C16.03,5.64 15.47,5.31 14.88,5.08L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.12,5.08C8.53,5.31 7.97,5.64 7.46,6.03L4.97,5.03C4.75,4.95 4.5,5.04 4.36,5.27L2.36,8.73C2.22,8.97 2.27,9.22 2.46,9.37L4.57,11.03C4.53,11.35 4.5,11.67 4.5,12C4.5,11.67 4.47,11.35 4.43,11.03L2.32,9.37C2.13,9.22 2.08,8.97 2.22,8.73L4.22,5.27C4.36,5.04 4.61,4.95 4.83,5.03L7.32,6.03C7.83,5.64 8.39,5.31 8.98,5.08L9.36,2.42C9.4,2.18 9.61,2 9.86,2H13.86C14.11,2 14.32,2.18 14.36,2.42L14.74,5.08C15.33,5.31 15.89,5.64 16.4,6.03L18.89,5.03C19.11,4.95 19.36,5.04 19.5,5.27L21.5,8.73C21.64,8.97 21.59,9.22 21.4,9.37L19.29,11.03C19.33,11.35 19.36,11.67 19.36,12C19.36,12.33 19.33,12.65 19.29,12.97L21.4,14.63C21.59,14.78 21.64,15.03 21.5,15.27L19.5,18.73C19.36,18.96 19.11,19.05 18.89,18.97L16.4,17.97C15.89,18.36 15.33,18.69 14.74,18.92L14.36,21.58C14.32,21.82 14.11,22 13.86,22H9.86C9.61,22 9.4,21.82 9.36,21.58L8.98,18.92C8.39,18.69 7.83,18.36 7.32,17.97L4.83,18.97C4.61,19.05 4.36,18.96 4.22,18.73L2.22,15.27C2.08,15.03 2.13,14.78 2.32,14.63L4.43,12.97Z" />
+            </svg>
+        </a>
     </nav>
     <div id="sidebar">
         <div class="header">
@@ -642,7 +653,43 @@
                 <span>ID: <strong id="sel-id" style="color:#888">None</strong></span>
                 <span id="sel-type"></span>
             </div>
+
+            <!-- Distribution Path -->
+            <div id="panel-distribution"
+                style="margin-top:15px; padding-top:10px; border-top:1px solid #222; display:none;">
+                <!-- RTSP -->
+                <div class="panel-header"
+                    style="padding:0; margin-bottom:5px; background:none; border:none; font-size:9px;">DISTRIBUTION
+                    (RTSP)</div>
+                <div style="display:flex; gap:5px; margin-bottom:10px;">
+                    <input type="text" id="inp-dist-url" readonly
+                        style="flex-grow:1; background:#000; border:1px solid #333; color:var(--accent); font-size:10px; padding:4px; border-radius:4px;"
+                        value="">
+                    <button class="icon-btn" id="btn-copy-dist" title="Copy RTSP URL">
+                        <svg style="width:14px;height:14px" viewBox="0 0 24 24">
+                            <path fill="currentColor"
+                                d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z" />
+                        </svg>
+                    </button>
+                </div>
+                <!-- WEB PLAYER -->
+                <div class="panel-header"
+                    style="padding:0; margin-bottom:5px; background:none; border:none; font-size:9px;">WEB PLAYER</div>
+                <div style="display:flex; gap:5px;">
+                    <input type="text" id="inp-web-url" readonly
+                        style="flex-grow:1; background:#000; border:1px solid #333; color:var(--accent); font-size:10px; padding:4px; border-radius:4px;"
+                        value="">
+                    <button class="icon-btn" id="btn-copy-web" title="Copy Web Player URL">
+                        <svg style="width:14px;height:14px" viewBox="0 0 24 24">
+                            <path fill="currentColor"
+                                d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
         </div>
+
+
 
         <!-- PROGRAM CONTROLS -->
         <div id="program-controls-panel" class="control-panel" style="margin-top:20px; display:none;">
@@ -693,6 +740,7 @@
                     <option value="image_source">Image (JPG/PNG/GIF)</option>
                     <option value="text_source">Static Text</option>
                     <option value="webrtc_audio">Remote Audio (Mic)</option>
+                    <option value="webrtc_video">Remote Camera (WebRTC)</option>
                 </select>
             </div>
 
@@ -1060,9 +1108,10 @@
                    <div style="flex-grow:1;">
                       <div style="display:flex; align-items:center;">
                           <strong style="color:#fff;">${ch.name}</strong>
-                          <button class="icon-btn" onclick="copyHostUrl('${ch.id}')" title="Copy Host URL" style="margin-left:8px; opacity:0.6;">
-                             <svg style="width:14px;height:14px" viewBox="0 0 24 24"><path fill="currentColor" d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z" /></svg>
-                          </button>
+                           <button class="icon-btn" onclick="copyHostUrl('${ch.id}')" title="Copy Host URL" style="margin-left:8px; opacity:1; color: var(--accent);">
+                              <svg style="width:16px;height:16px" viewBox="0 0 24 24"><path fill="currentColor" d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z" /></svg>
+                           </button>
+
                           ${isDef}
                       </div>
                       <span style="font-size:10px; color:#666;">${ch.id} (${ch.width}x${ch.height})</span>
@@ -1079,25 +1128,24 @@
         function copyHostUrl(id) {
             const event = window.event;
             const url = window.location.origin + '/host.html?target=' + id;
+            const btn = event ? (event.currentTarget.closest('.icon-btn') || event.currentTarget) : null;
 
             // Modern Clipboard API
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 navigator.clipboard.writeText(url).then(() => {
-                    const btn = event ? event.currentTarget : null;
                     if (btn) {
                         const oldContent = btn.innerHTML;
-                        btn.innerHTML = '<span style="color:#00f3ff; font-size:10px;">COPIED!</span>';
-                        setTimeout(() => btn.innerHTML = oldContent, 1000);
+                        btn.innerHTML = '<span style="color:#00f3ff; font-size:10px; font-weight:bold;">COPIED!</span>';
+                        setTimeout(() => btn.innerHTML = oldContent, 1200);
                     }
                 }).catch(err => {
-                    // Fallback to prompt
                     window.prompt("Copy URL:", url);
                 });
             } else {
-                // Manual Fallback for older browsers
                 window.prompt("Copy URL:", url);
             }
         }
+
 
         function setDefault(id) {
             socket.emit('set_default_channel', id, (res) => {
@@ -1235,9 +1283,13 @@
                 tab.innerHTML = `
                     <div style="display:flex; align-items:center; gap:5px;">
                         <span>${name}</span>
+                        <button class="icon-btn" onclick="copyHostUrl('${tid}')" title="Copy Host URL" style="padding:2px; margin-left:4px;">
+                            <svg style="width:12px;height:12px" viewBox="0 0 24 24"><path fill="currentColor" d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z" /></svg>
+                        </button>
                     </div>
                     <span class="chrome-tab-close" onclick="closeTab('${tid}')">×</span>
                  `;
+
                 container.appendChild(tab);
             });
         }
@@ -1450,9 +1502,19 @@
             id: document.getElementById('sel-id'),
             type: document.getElementById('sel-type')
         };
-        socket.on('scene_update', (scene) => {
-            currentScene = scene;
-            renderEverything();
+        socket.on('scene_update', (data) => {
+            console.log("SCENE_UPDATE RECEIVED:", data.target);
+            // Check for new object format {target, scene} or old raw scene format
+            const incomingTarget = (data.target || '').toLowerCase();
+            const scene = data.scene || data; // Fallback if data is the scene itself
+
+            // If we don't have a target yet, or it matches, or the server sent a force-update
+            if (!incomingTarget || !currentTarget || incomingTarget === currentTarget.toLowerCase()) {
+                if (!currentScene || JSON.stringify(currentScene) !== JSON.stringify(scene)) {
+                    currentScene = scene;
+                    renderEverything();
+                }
+            }
         });
 
         function renderEverything() {
@@ -1482,17 +1544,24 @@
                 item.innerHTML = `
                     <div class="layer-left" style="${itemClass}">
                         <span class="layer-icon">${typeIcon}</span> 
-                        <span>${layer.id}</span>
-                        <span style="font-size:9px; color:#555; margin-left:5px;">${layer.source_id || ''}</span>
+                        <div style="display:flex; flex-direction:column;">
+                            <span style="font-weight:bold;">${layer.id}</span>
+                            <span style="font-size:9px; color:#555;">${layer.source_id || ''}</span>
+                        </div>
                     </div>
                     <div class="layer-actions">
-                        <button class="icon-btn" onclick="toggleLock('${layer.id}', ${!isLocked})" title="Lock/Unlock (Click-through)">${lockIcon}</button>
+                        ${layer.source_id ? `
+                        <button class="icon-btn" onclick="copyPublicUrl('${layer.source_id}')" title="Copy Public RTSP URL">
+                            <svg style="width:12px;height:12px" viewBox="0 0 24 24"><path fill="currentColor" d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z" /></svg>
+                        </button>` : ''}
+                        <button class="icon-btn" onclick="toggleLock('${layer.id}', ${!isLocked})" title="Lock/Unlock">${lockIcon}</button>
                         <button class="icon-btn" onclick="toggleVisibility('${layer.id}', ${!isVisible})" title="Show/Hide">${visIcon}</button>
                         <button class="icon-btn" onclick="openEditModal('${layer.id}')" title="Settings">⚙️</button>
                         <button class="icon-btn" onclick="toggleMute('${layer.id}', ${!isMuted})" title="Mute/Unmute">${muteIcon}</button>
-                        <button class="icon-btn" onclick="confirmDelete('${layer.id}')" title="Delete">🗑️</button>
+                        <button class="icon-btn" onclick="confirmDelete('${layer.id}')" title="Delete Source" style="color:#ff0055">🗑️</button>
                     </div>
                 `;
+
                 item.onclick = (e) => {
                     if (e.target.tagName !== 'BUTTON') selectLayer(layer.id);
                 };
@@ -1598,9 +1667,6 @@
             const layer = currentScene.layers.find(l => l.id === id);
 
             if (layer) {
-                // Audio-only check: type has 'audio' but NOT 'video' (to exclude webrtc_video which has audio but is visual)
-                // Actually 'webrtc_video' does NOT have 'audio' in type string. 'webrtc_audio' DOES.
-                // So checking .includes('audio') is safe for 'webrtc_audio'.
                 const isAudioOnly = layer.type.includes('audio');
 
                 inputs.x.value = layer.position.x;
@@ -1628,6 +1694,27 @@
                     inp.parentElement.style.opacity = isAudioOnly ? '0.5' : '1';
                 });
 
+                // Update Distribution Field
+                const distPanel = document.getElementById('panel-distribution');
+                const distInput = document.getElementById('inp-dist-url');
+                const webInput = document.getElementById('inp-web-url');
+                const distBtn = document.getElementById('btn-copy-dist');
+                const webBtn = document.getElementById('btn-copy-web');
+
+                if (layer.source_id) {
+                    distPanel.style.display = 'block';
+                    const rtspUrl = `rtsp://${window.location.hostname}:8554/${layer.source_id}`;
+                    const webUrl = `https://cc.dden.mx/stream.html?src=${layer.source_id}`;
+
+                    distInput.value = rtspUrl;
+                    webInput.value = webUrl;
+
+                    distBtn.onclick = () => copyPublicUrl(layer.source_id, 'rtsp');
+                    webBtn.onclick = () => copyPublicUrl(layer.source_id, 'web');
+                } else {
+                    distPanel.style.display = 'none';
+                }
+
             } else {
                 selectedLayerId = null;
                 inputs.id.innerText = "None";
@@ -1643,9 +1730,33 @@
                 });
                 inputs.opacityLabel.innerText = "1.0";
                 inputs.volumeLabel.innerText = "1.0";
+                document.getElementById('panel-distribution').style.display = 'none';
             }
             renderEverything();
         }
+
+        function copyPublicUrl(sourceId, type = 'rtsp') {
+            const event = window.event;
+            const rtspUrl = `rtsp://${window.location.hostname}:8554/${sourceId}`;
+            const webUrl = `https://cc.dden.mx/stream.html?src=${sourceId}`;
+            const finalUrl = type === 'web' ? webUrl : rtspUrl;
+
+            const btn = event ? (event.currentTarget.closest('.icon-btn') || event.currentTarget) : null;
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(finalUrl).then(() => {
+                    if (btn) {
+                        const oldContent = btn.innerHTML;
+                        const label = type === 'web' ? 'WEB OK!' : 'RTSP OK!';
+                        btn.innerHTML = `<span style="color:#0f0; font-size:9px; font-weight:bold;">${label}</span>`;
+                        setTimeout(() => btn.innerHTML = oldContent, 1000);
+                    }
+                });
+            } else {
+                window.prompt("URL:", finalUrl);
+            }
+        }
+
 
         // --- Moveable Integration ---
         moveable = new Moveable(document.getElementById('virtual-canvas'), {
@@ -1791,9 +1902,15 @@
                 if (layer.z_index !== newZ) {
                     // Optimistic update
                     layer.z_index = newZ;
-                    socket.emit('update_layer', { layerId: layer.id, props: { z_index: newZ } });
+                    socket.emit('update_layer', {
+                        layerId: layer.id,
+                        props: { z_index: newZ },
+                        target: currentTarget // FIX: added missing target
+                    });
                 }
             });
+            // Update local UI immediately
+            renderEverything();
         }
 
         window.changeZIndex = (delta) => {
@@ -1825,12 +1942,12 @@
         // --- Layer Management ---
         window.toggleMute = (id, muteState) => {
             pushHistory();
-            socket.emit('update_layer', { layerId: id, props: { muted: muteState } });
+            socket.emit('update_layer', { layerId: id, props: { muted: muteState }, target: currentTarget });
         };
 
         window.toggleVisibility = (id, visState) => {
             pushHistory();
-            socket.emit('update_layer', { layerId: id, props: { visible: visState } });
+            socket.emit('update_layer', { layerId: id, props: { visible: visState }, target: currentTarget });
         };
 
         window.toggleLock = (id, lockState) => {
@@ -1870,7 +1987,7 @@
 
             // Toggle Fields
             document.getElementById('field-device-select').style.display = (type === 'device_video') ? 'block' : 'none';
-            document.getElementById('field-source-id').style.display = (type === 'webrtc_audio' || type === 'local_video') ? 'block' : 'none';
+            document.getElementById('field-source-id').style.display = (type === 'webrtc_audio' || type === 'webrtc_video' || type === 'local_video') ? 'block' : 'none';
             document.getElementById('field-url').style.display = (type === 'web_source') ? 'block' : 'none';
             document.getElementById('field-text').style.display = (type === 'text_source') ? 'block' : 'none';
             document.getElementById('field-image-url').style.display = (type === 'image_source') ? 'block' : 'none';
@@ -1925,14 +2042,16 @@
                 } else {
                     return alert("Device not found");
                 }
-            } else if (formType === 'webrtc_audio' || formType === 'local_video') {
+            } else if (formType === 'webrtc_audio' || formType === 'webrtc_video' || formType === 'local_video') {
                 finalSourceId = document.getElementById('add-src-id').value;
             }
+
+            if (!currentScene) return alert("Error: Scene not loaded. Please select a channel tab first.");
 
             const newLayer = {
                 id: id,
                 type: finalType,
-                z_index: currentScene.layers.length + 10,
+                z_index: (currentScene.layers || []).length + 10,
                 position: { x: 10, y: 10, width: 50, height: 30 },
                 muted: false
             };
@@ -1951,7 +2070,7 @@
             pushHistory();
             socket.emit('add_layer', {
                 newLayer: newLayer,
-                target: currentTarget
+                target: currentTarget || 'vertical'
             });
             closeModal('add-modal');
         };

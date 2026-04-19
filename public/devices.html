@@ -174,14 +174,49 @@
             border: none;
         }
 
-        .btn-danger {
-            color: #ff4444;
-        }
-
         .btn-danger:hover {
             background: rgba(255, 68, 68, 0.1);
             border-color: #ff4444;
         }
+
+        /* RTSP Copy Field */
+        .rtsp-copy-box {
+            margin-top: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            padding: 5px 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .rtsp-copy-box input {
+            flex-grow: 1;
+            background: none;
+            border: none;
+            color: var(--accent);
+            font-size: 11px;
+            font-family: monospace;
+            outline: none;
+            width: 100%;
+        }
+
+        .icon-btn {
+            background: none;
+            border: none;
+            color: #888;
+            cursor: pointer;
+            padding: 4px;
+            display: flex;
+            align-items: center;
+            transition: 0.2s;
+        }
+
+        .icon-btn:hover {
+            color: var(--accent);
+        }
+
 
         /* MODAL */
         #modal {
@@ -232,7 +267,49 @@
         .form-group select:focus {
             border-color: var(--accent);
         }
+
+        /* LOG TERMINAL */
+        #log-terminal {
+            margin-top: 40px;
+            background: #000;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 15px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 11px;
+            height: 200px;
+            overflow-y: auto;
+            color: #888;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .log-entry {
+            margin-bottom: 4px;
+            white-space: pre-wrap;
+        }
+
+        .log-time {
+            color: #444;
+            margin-right: 8px;
+        }
+
+        .log-info {
+            color: #00f3ff;
+        }
+
+        .log-success {
+            color: #0f0;
+        }
+
+        .log-error {
+            color: #f44;
+        }
+
+        .log-warn {
+            color: #ff0;
+        }
     </style>
+
 </head>
 
 <body>
@@ -260,13 +337,23 @@
     <main>
         <header>
             <h1>Devices Hub</h1>
-            <button class="btn btn-add" onclick="openModal()">+ NEW DEVICE</button>
+            <div style="display:flex; gap:10px;">
+                <button id="btn-sync" class="btn" onclick="syncDevices()">🔄 SYNC DEVICES</button>
+                <button class="btn btn-add" onclick="openModal()">+ NEW DEVICE</button>
+            </div>
         </header>
+
 
         <div id="grid" class="grid">
             <!-- Cards will be injected here -->
         </div>
+
+        <div id="log-terminal">
+            <div class="log-entry"><span class="log-time">[System]</span> <span class="log-info">Debug console ready.
+                    Monitoring device synchronization...</span></div>
+        </div>
     </main>
+
 
     <div id="modal">
         <div class="modal-content">
@@ -307,6 +394,17 @@
         // State
         let devices = [];
         let streams = {}; // Go2RTC Live Status
+
+        function addLog(msg, type = 'info') {
+            const term = document.getElementById('log-terminal');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            const time = new Date().toLocaleTimeString();
+            entry.innerHTML = `<span class="log-time">[${time}]</span> <span class="log-${type}">${msg}</span>`;
+            term.appendChild(entry);
+            term.scrollTop = term.scrollHeight;
+        }
+
 
         function updateForm() {
             const type = document.getElementById('dev-type').value;
@@ -365,15 +463,75 @@
             <p style="font-family:monospace; color:#888;">ID: ${dev.source_id}</p>
             ${dev.url ? `<p style="font-size:10px; color:#555; overflow:hidden; text-overflow:ellipsis;">${dev.url}</p>` : ''}
             
+            <div class="rtsp-copy-box">
+                <input type="text" value="rtsp://${window.location.hostname}:8554/${dev.source_id}" readonly>
+                <button class="icon-btn" onclick="copyPublicUrl('${dev.source_id}', 'rtsp')" title="Copy RTSP URL">
+                    <svg style="width:16px;height:16px" viewBox="0 0 24 24"><path fill="currentColor" d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z" /></svg>
+                </button>
+            </div>
+            
+            <div class="rtsp-copy-box" style="margin-top:5px;">
+                <input type="text" value="https://cc.dden.mx/stream.html?src=${dev.source_id}" readonly>
+                <button class="icon-btn" onclick="copyPublicUrl('${dev.source_id}', 'web')" title="Copy Web Player URL">
+                    <svg style="width:16px;height:16px" viewBox="0 0 24 24"><path fill="currentColor" d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z" /></svg>
+                </button>
+            </div>
+
+
             <div class="card-actions">
                 <button class="btn btn-danger" onclick="deleteDevice('${dev.id}')">REMOVE</button>
             </div>
+
         `;
                 grid.appendChild(card);
             });
         }
 
+        async function syncDevices() {
+            const btn = document.getElementById('btn-sync');
+            const oldText = btn.innerText;
+            btn.innerText = "⏳ SYNCING...";
+            btn.disabled = true;
+
+            addLog("Starting manual synchronization of all devices...", "warn");
+
+            try {
+                const res = await fetch('/api/devices/sync', { method: 'POST' });
+                const results = await res.json();
+
+                addLog(`Sync completed. Success: ${results.success}, Failed: ${results.failed}`, results.failed > 0 ? 'warn' : 'success');
+
+                if (results.details && results.details.length > 0) {
+                    results.details.forEach(d => {
+                        addLog(`FAILED: ${d.id} - ${d.error}`, "error");
+                    });
+                }
+
+                btn.innerText = `✅ SYNCED (${results.success})`;
+                btn.style.borderColor = "#0f0";
+
+                setTimeout(() => {
+                    btn.innerText = oldText;
+                    btn.disabled = false;
+                    btn.style.borderColor = "";
+                }, 3000);
+
+                fetchAll(); // Refresh grid
+            } catch (e) {
+                addLog(`CRITICAL ERROR during sync: ${e.message}`, "error");
+                btn.innerText = "❌ ERROR";
+                btn.style.borderColor = "#f00";
+                setTimeout(() => {
+                    btn.innerText = oldText;
+                    btn.disabled = false;
+                    btn.style.borderColor = "";
+                }, 3000);
+            }
+        }
+
+
         async function saveDevice() {
+
             const name = document.getElementById('dev-name').value;
             const type = document.getElementById('dev-type').value;
             const source_id = document.getElementById('dev-source-id').value;
@@ -421,7 +579,31 @@
         }
         function closeModal() { document.getElementById('modal').style.display = 'none'; }
 
+        function copyPublicUrl(sourceId, type = 'rtsp') {
+            const event = window.event;
+            const rtspUrl = `rtsp://${window.location.hostname}:8554/${sourceId}`;
+            const webUrl = `https://cc.dden.mx/stream.html?src=${sourceId}`;
+            const finalUrl = type === 'web' ? webUrl : rtspUrl;
+
+            const btn = event ? (event.currentTarget.closest('.icon-btn') || event.currentTarget) : null;
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(finalUrl).then(() => {
+                    if (btn) {
+                        const oldContent = btn.innerHTML;
+                        const label = type === 'web' ? 'WEB OK!' : 'RTSP OK!';
+                        btn.innerHTML = `<span style="color:#0f0; font-size:9px; font-weight:bold;">${label}</span>`;
+                        setTimeout(() => btn.innerHTML = oldContent, 1000);
+                    }
+                });
+            } else {
+                window.prompt("URL:", finalUrl);
+            }
+        }
+
+
         // Initial fetch
+
         fetchAll();
         setInterval(fetchAll, 5000); // Polling for status
     </script>

@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Expedition 33 Paintress Overlay</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Cinzel:wght@400;700&family=IM+Fell+Double+Pica&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            /* Palette: Arcane Paintress */
+            --magic-indigo: #2a2a72;
+            --magic-cyan: #00f3ff;
+            --magic-gold: #d4af37;
+            --magic-smoke: rgba(10, 10, 20, 0.8);
+
+            --font-rune: 'Cinzel', serif;
+            --font-text: 'IM Fell Double Pica', serif;
+            --font-nums: 'Bebas Neue', sans-serif;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            background: transparent;
+            font-family: var(--font-text);
+            color: #dcdcdc;
+        }
+
+        /* --- ANIMATIONS --- */
+
+        /* 1. Smoke Reveal: Condenses from blur and wide spacing to sharp */
+        @keyframes smokeReveal {
+            0% {
+                opacity: 0;
+                filter: blur(20px);
+                letter-spacing: 1em;
+                transform: scale(1.1);
+            }
+
+            40% {
+                opacity: 1;
+            }
+
+            100% {
+                opacity: 1;
+                filter: blur(0px);
+                letter-spacing: normal;
+                transform: scale(1);
+            }
+        }
+
+        /* 2. Arcane Pulse: Soft glow breathing */
+        @keyframes arcanePulse {
+
+            0%,
+            100% {
+                text-shadow: 0 0 10px rgba(0, 243, 255, 0.3);
+            }
+
+            50% {
+                text-shadow: 0 0 25px rgba(0, 243, 255, 0.6), 0 0 5px white;
+            }
+        }
+
+        /* 3. Drift: Slow floating movement */
+        @keyframes drift {
+            0% {
+                transform: translateY(0px);
+            }
+
+            50% {
+                transform: translateY(-5px);
+            }
+
+            100% {
+                transform: translateY(0px);
+            }
+        }
+
+        /* --- LAYOUT COMPONENTS --- */
+
+        /* LEFT SIDEBAR (Liquid Gold Line) */
+        .magic-sidebar {
+            position: absolute;
+            left: 30px;
+            top: 10%;
+            height: 80%;
+            width: 4px;
+            background: linear-gradient(to bottom, transparent, var(--magic-gold), transparent);
+            box-shadow: 0 0 15px var(--magic-gold);
+            opacity: 0.8;
+        }
+
+        /* CAMEO / WEBCAM FRAME (Top Left) */
+        .frame-magic {
+            position: absolute;
+            top: 40px;
+            left: 60px;
+            width: 320px;
+            height: 180px;
+
+            /* Glassmorphism */
+            background: rgba(10, 10, 25, 0.3);
+            backdrop-filter: blur(4px);
+            border-bottom: 2px solid var(--magic-cyan);
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            opacity: 0;
+            /* Starts hidden, animates in */
+            animation: smokeReveal 1.5s ease-out forwards 0.5s;
+        }
+
+        .frame-label {
+            position: absolute;
+            bottom: -30px;
+            left: 0;
+            font-family: var(--font-rune);
+            font-size: 0.9em;
+            color: var(--magic-cyan);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            animation: arcanePulse 4s infinite 2s;
+            /* Delayed start */
+        }
+
+        /* CLOCK (Top Right - Floating Runes) */
+        .rune-clock {
+            position: absolute;
+            top: 40px;
+            right: 50px;
+            text-align: right;
+            animation: drift 6s ease-in-out infinite;
+        }
+
+        .clock-time {
+            font-family: var(--font-nums);
+            font-size: 4.5em;
+            background: linear-gradient(180deg, white, var(--magic-gold));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 10px rgba(212, 175, 55, 0.5));
+            line-height: 0.8;
+        }
+
+        .clock-date {
+            font-family: var(--font-rune);
+            color: var(--magic-cyan);
+            font-size: 0.9em;
+            letter-spacing: 4px;
+            margin-top: 5px;
+            opacity: 0.7;
+        }
+
+        /* NOW PLAYING (Bottom Right - Paint Smoke) */
+        .music-vortex {
+            position: absolute;
+            bottom: 40px;
+            right: 0;
+            width: 600px;
+            height: 150px;
+
+            /* Gradient Mask to fade out left side */
+            mask: linear-gradient(90deg, transparent, black 40%);
+            -webkit-mask: linear-gradient(90deg, transparent, black 40%);
+
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 50px;
+        }
+
+        .track-info {
+            text-align: right;
+            position: relative;
+        }
+
+        .track-title {
+            font-size: 2.5em;
+            font-style: italic;
+            text-transform: uppercase;
+            white-space: nowrap;
+
+            /* The Magic Reveal Effect */
+            opacity: 0;
+            /* Default hidden */
+        }
+
+        /* Class to trigger animation via JS */
+        .reveal-effect {
+            animation: smokeReveal 2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+        }
+
+        .track-artist {
+            font-family: var(--font-rune);
+            color: var(--magic-gold);
+            font-size: 1.2em;
+            letter-spacing: 3px;
+            margin-top: -10px;
+
+            opacity: 0;
+        }
+
+        .reveal-effect-delayed {
+            animation: smokeReveal 2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards 0.5s;
+        }
+
+        /* VISUALIZER PARTICLES (Simple CSS Dots) */
+        .particle {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            opacity: 0;
+            animation: rise 4s linear forwards;
+            pointer-events: none;
+        }
+
+        @keyframes rise {
+            0% {
+                opacity: 0;
+                transform: translateY(0) scale(0.5);
+            }
+
+            20% {
+                opacity: 0.8;
+            }
+
+            100% {
+                opacity: 0;
+                transform: translateY(-100px) scale(0);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Left Decoration -->
+    <div class="magic-sidebar"></div>
+
+    <!-- Cameo Frame -->
+    <div class="frame-magic">
+        <span style="opacity:0.6; font-size:0.8em; letter-spacing:1px;">VIDEO FEED LINKED</span>
+        <div class="frame-label">Operator // 01</div>
+    </div>
+
+    <!-- Clock -->
+    <div class="rune-clock">
+        <div class="clock-time" id="clock">00:00</div>
+        <div class="clock-date" id="date">CYCLE 33</div>
+    </div>
+
+    <!-- Music -->
+    <div class="music-vortex">
+        <div class="track-info">
+            <div class="track-title reveal-effect" id="trackName">Silence</div>
+            <div class="track-artist reveal-effect-delayed" id="artistName">--</div>
+        </div>
+    </div>
+
+    <script>
+        // --- CLOCK ---
+        function updateClock() {
+            const now = new Date();
+            const h = String(now.getHours()).padStart(2, '0');
+            const m = String(now.getMinutes()).padStart(2, '0');
+            document.getElementById('clock').innerText = `${h}:${m}`;
+
+            const options = { weekday: 'long', month: 'short', day: 'numeric' };
+            const dateStr = now.toLocaleDateString('en-US', options).toUpperCase();
+            document.getElementById('date').innerText = `CYCLE 33 // ${dateStr}`;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // --- PARTICLE GENERATOR ---
+        function spawnParticle() {
+            const p = document.createElement('div');
+            p.classList.add('particle');
+
+            // Random size
+            const size = Math.random() * 4 + 2;
+            p.style.width = `${size}px`;
+            p.style.height = `${size}px`;
+
+            // Random Position (Bottom-ish)
+            p.style.left = Math.random() * 100 + 'vw';
+            p.style.bottom = Math.random() * 20 + 'vh';
+
+            // Random Color (Gold or Cyan ash)
+            const color = Math.random() > 0.5 ? 'var(--magic-gold)' : 'var(--magic-cyan)';
+            p.style.background = color;
+            p.style.boxShadow = `0 0 ${size * 2}px ${color}`;
+
+            document.body.appendChild(p);
+
+            // Cleanup
+            setTimeout(() => p.remove(), 4000);
+        }
+        setInterval(spawnParticle, 300); // Create dust continuously
+
+        // --- MUSIC ENGINE (Self-Contained Last.FM Polling) ---
+        // Works in OBS independently
+
+        const LASTFM_CONFIG = {
+            apiKey: '3c93be4fddcf1fef5e080971b8115cd9',
+            user: 'mauriziock', // Default
+            pollInterval: 5000
+        };
+
+        let lastTrackTitle = '';
+
+        async function updateMusic() {
+            try {
+                // 1. Try to get user from server config (optional, falls back to default)
+                let user = LASTFM_CONFIG.user;
+                try {
+                    const configRes = await fetch('/api/config');
+                    if (configRes.ok) {
+                        const config = await configRes.json();
+                        if (config.lastfmUser) user = config.lastfmUser;
+                    }
+                } catch (e) { /* Ignore */ }
+
+                // 2. Poll Last.fm
+                const response = await fetch(`https://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user=${user}&api_key=${LASTFM_CONFIG.apiKey}&format=json&limit=1`);
+                const data = await response.json();
+
+                if (!data.recenttracks || !data.recenttracks.track.length) return;
+
+                const track = data.recenttracks.track[0];
+                // Check if playing (optional)
+                // const isPlaying = (track['@attr'] && track['@attr'].nowplaying === 'true');
+
+                const title = track.name;
+                const artist = track.artist['#text'];
+
+                // Update if Changed
+                if (lastTrackTitle !== title) {
+                    lastTrackTitle = title;
+                    updateVisuals(title, artist);
+                }
+
+            } catch (err) {
+                console.error("Music Fetch Error:", err);
+            }
+        }
+
+        function updateVisuals(title, artist) {
+            const tName = document.getElementById('trackName');
+            const aName = document.getElementById('artistName');
+
+            // Reset Animation
+            tName.classList.remove('reveal-effect');
+            aName.classList.remove('reveal-effect-delayed');
+            void tName.offsetWidth; // Force Reflow
+
+            // Set Content
+            tName.innerText = title;
+            aName.innerText = artist;
+
+            // Trigger Animation
+            tName.classList.add('reveal-effect');
+            aName.classList.add('reveal-effect-delayed');
+        }
+
+        // Start Polling
+        setInterval(updateMusic, LASTFM_CONFIG.pollInterval);
+        updateMusic();
+
+    </script>
+</body>
+
+</html>

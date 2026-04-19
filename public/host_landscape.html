@@ -122,8 +122,13 @@
         let firstSceneReceived = false;
 
         // --- 2. SCENE RENDERER ---
-        socket.on('scene_update', (scene) => {
+        socket.on('scene_update', (data) => {
+            const { scene, state } = data;
             currentScene = scene;
+
+            // Apply Persistent State (CSS Classes)
+            if (state) applyState(state);
+
             renderScene(scene);
 
             if (!firstSceneReceived) {
@@ -132,6 +137,74 @@
                 socket.emit('request_offers');
             }
         });
+
+        socket.on('state_update', (data) => {
+            log("STATE UPDATE RECEIVED");
+            applyState(data.state);
+        });
+
+        function applyState(stateObj) {
+            // Reset all state classes first? Or purely additive? 
+            // Better to manage specific known toggle keys if possible, 
+            // but for generic approach, we can iterate.
+            // A safer approach for "toggles" is to rely on the server's truth.
+
+            // 1. Remove all classes that start with 'state-' to ensure clean slate?
+            // This might feel too aggressive if other scripts use similar naming.
+            // Instead, let's assume the stateObj contains the TRUTH for all active keys.
+
+            // For now, let's iterate the incoming state and apply/remove
+            Object.keys(stateObj).forEach(key => {
+                const val = stateObj[key];
+                // Convention: state persistence usually maps to CSS classes for visibility/mode
+                // We'll trust the value. If boolean true => add class. False => remove.
+                // We assume the class name matches the value provided by manifest or simple convention.
+                // Actually, the manifest says: value: "state-idle".
+                // So the key is "idle", the value stored might be true/false?
+                // Let's support both: 
+                // A) Key=idle, Value=true -> we need to know the classname? 
+                //    Problem: Host doesn't know the manifest mapping here easily without more data.
+                //    Simpler: The Value stored in JSON IS the class name? No, usually it's boolean logic.
+
+                // ADJUSTMENT: We will assume the "value" coming from Admin IS the class name if it's a string,
+                // or if it's boolean, we might need a mapping.
+                // Looking at programs.html, set_channel_state sends {key, value}. 
+                // If the trigger action is 'class_toggle', the "value" attribute in manifest is the Class Name.
+                // But the STATE stored should probably be: { [key]: "state-idle" } (active) or { [key]: null } (inactive).
+
+                // Let's implement robust handling:
+                if (val && typeof val === 'string') {
+                    document.body.classList.add(val);
+                } else if (!val) {
+                    // If we knew the class name corresponding to this key, we could remove it.
+                    // Since we don't map keys to classes here, we might need to rely on 
+                    // the convention that if we receive value=false or null, 
+                    // we can't easily guess the class name to remove unless we track it.
+
+                    // EXPERIMENTAL FIX: 
+                    // When we turn ON a state, we store it in a local map: activeStates = { key: className }
+                    // When we turn OFF, we look up the key and remove that class.
+                }
+            });
+
+            // Improved State Application with Local Tracking
+            if (!window.activeStates) window.activeStates = {};
+
+            Object.keys(stateObj).forEach(key => {
+                const val = stateObj[key];
+                if (val && typeof val === 'string') {
+                    // Activate
+                    document.body.classList.add(val);
+                    window.activeStates[key] = val;
+                } else {
+                    // Deactivate
+                    if (window.activeStates[key]) {
+                        document.body.classList.remove(window.activeStates[key]);
+                        delete window.activeStates[key];
+                    }
+                }
+            });
+        }
 
         function renderScene(scene) {
             log(`Rendering Scene: ${scene.active_scene || 'unknown'} (${scene.layers.length} layers)`);

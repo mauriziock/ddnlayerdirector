@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Radio Monitor | DriftersDen</title>
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;700&family=Share+Tech+Mono&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg: #050505;
+            --accent: #00f3ff;
+            --card: rgba(255, 255, 255, 0.03);
+            --border: rgba(0, 243, 255, 0.2);
+        }
+
+        body {
+            background: var(--bg);
+            color: #eee;
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .header {
+            width: 100%;
+            max-width: 900px;
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 10px;
+            margin-bottom: 40px;
+        }
+
+        .station-name {
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+            color: var(--accent);
+        }
+
+        .monitor-label {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .main-grid {
+            width: 100%;
+            max-width: 900px;
+            display: grid;
+            grid-template-columns: 250px 1fr;
+            gap: 40px;
+        }
+
+        .now-playing-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        #art {
+            width: 200px;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .track-info h2 {
+            margin: 0;
+            font-size: 1.2rem;
+        }
+
+        .track-info p {
+            margin: 5px 0;
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .script-section {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .script-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            padding: 30px;
+            border-radius: 12px;
+            position: relative;
+        }
+
+        .script-card::before {
+            content: 'BROADCAST_SCRIPT';
+            position: absolute;
+            top: -10px;
+            left: 20px;
+            background: var(--bg);
+            padding: 0 10px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.7rem;
+            color: var(--accent);
+        }
+
+        #script-content {
+            font-size: 1.8rem;
+            line-height: 1.6;
+            color: #fff;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .facts-card {
+            background: rgba(255, 255, 255, 0.02);
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.9rem;
+            color: rgba(0, 243, 255, 0.7);
+        }
+
+        .live-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.7rem;
+            color: #f00;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            background: #f00;
+            border-radius: 50%;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.3;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <div class="station-name">DRIFTERS DEN</div>
+        <div class="monitor-label">HOST_MONITOR_v1.0</div>
+    </div>
+
+    <div class="main-grid">
+        <div class="now-playing-card">
+            <img id="art" src="" alt="Album Art">
+            <div class="track-info">
+                <h2 id="track">ESPERANDO...</h2>
+                <p id="artist">SIN SEÑAL</p>
+            </div>
+            <div class="live-indicator" style="justify-content: center; margin-top: 20px;">
+                <div class="dot"></div> POLLING_LASTFM
+            </div>
+        </div>
+
+        <div class="script-section">
+            <div class="script-card">
+                <div id="script-content">Esperando a que la IA genere el guion para la siguiente pista...</div>
+            </div>
+            <div class="facts-card">
+                <strong>ON-SCREEN DATA:</strong>
+                <div id="facts-content" style="margin-top: 10px;">---</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentTrack = '';
+
+        async function updateMonitor() {
+            try {
+                const configRes = await fetch('/api/config');
+                const config = await configRes.json();
+                const user = config.lastfmUser || 'mauriziock';
+
+                const response = await fetch(`https://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user=${user}&api_key=3c93be4fddcf1fef5e080971b8115cd9&format=json&limit=1`);
+                const data = await response.json();
+
+                if (!data.recenttracks || !data.recenttracks.track.length) return;
+
+                const track = data.recenttracks.track[0];
+                const isPlaying = (track['@attr'] && track['@attr'].nowplaying === 'true');
+
+                if (isPlaying) {
+                    const title = track.name;
+                    const artist = track.artist['#text'];
+                    const img = track.image[3]['#text'] || track.image[2]['#text'];
+
+                    if (currentTrack !== title) {
+                        currentTrack = title;
+                        document.getElementById('track').textContent = title;
+                        document.getElementById('artist').textContent = artist;
+                        document.getElementById('art').src = img || '';
+
+                        fetchAIScript(artist, title);
+                    }
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        async function fetchAIScript(artist, track) {
+            try {
+                const res = await fetch(`/api/track-info?artist=${encodeURIComponent(artist)}&track=${encodeURIComponent(track)}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    document.getElementById('script-content').textContent = data.script;
+                    document.getElementById('facts-content').textContent = data.facts.join(' | ');
+                }
+            } catch (e) {
+                document.getElementById('script-content').textContent = "ERROR: No se pudo conectar con el asistente de IA.";
+            }
+        }
+
+        setInterval(updateMonitor, 5000);
+        updateMonitor();
+    </script>
+</body>
+
+</html>

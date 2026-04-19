@@ -503,14 +503,53 @@
                     const active = btn.classList.toggle('btn-accent');
                     let payload = null;
 
-                    // If it's a transient trigger and being activated, ask for payload?
-                    if (trig.action === 'trigger' && active) {
-                        const msg = prompt("Enter Payload (e.g. message text):", "SYSTEM ALERT ACTIVE");
-                        if (msg) payload = { message: msg };
-                    }
+                    // If it's a transient trigger...
+                    let msgType;
+                    if (trig.action === 'trigger') {
+                        if (active) {
+                            const msg = prompt("Enter Payload (e.g. message text):", "SYSTEM ALERT ACTIVE");
+                            if (msg) payload = { message: msg };
 
-                    const msgType = trig.action === 'trigger' ? 'trigger_state' : 'scene_state';
-                    frame.contentWindow.postMessage({ type: msgType, key: trig.id, value: active, payload: payload }, '*');
+                            // Transients shouldn't use set_channel_state mostly, but fire_trigger
+                            // However, user specifically wants STATES to be stable.
+                            // If it's a "Trigger", it usually means fire-and-forget. 
+                            // If it's a State, it persists.
+
+                            // We will keep 'trigger' as transient postMessage for now (or via server fire_trigger)
+                            // But for CLASS TOGGLE, we integrate properly.
+                            msgType = 'trigger_state';
+                            frame.contentWindow.postMessage({ type: msgType, key: trig.id, value: active, payload: payload }, '*');
+                        }
+                    } else {
+                        // IT IS A STATE / TOGGLE
+                        // Use the new Persistent API
+                        // We need the ID of the program? No, we need the Channel ID!
+                        // In this Experimental View, we are previewing a Program, not a Channel.
+                        // Ideally we should emulate a "Test Channel".
+                        // For now, let's keep using postMessage for the "Preview Frame",
+                        // BUT if we were controlling a real channel, we'd use socket.
+
+                        // SINCE THIS IS LOCAL PREVIEW IFRAME:
+                        // We must mimic the server's "State Update" behavior locally so the user sees it work.
+
+                        // Our host updated code listens for 'state_update' socket event OR we can simulate via postMessage
+                        // looking at host code, it only listens to SOCKET for state_update.
+                        // We should add a bridge in host listener or just inject state.
+
+                        // Wait! The user wants the SYSTEM to be stable. 
+                        // This 'Experimental Space' is just for testing triggers. 
+                        // To properly test the new PERSISTENCE, we should probably use a Real Channel.
+
+                        // Let's update the PREVIEW frame to respect the postMessage for testing
+                        // but ensure the REAL implementation uses the socket.
+
+                        // Currently, the host listens for:
+                        // window.addEventListener('message', ...) 
+                        // The existing code at bottom of stark_hud.html handles this via window.horizon.
+
+                        msgType = 'state_change'; // Matched stark_hud listener
+                        frame.contentWindow.postMessage({ type: msgType, key: trig.id, value: active ? trig.value : false }, '*');
+                    }
                 };
                 list.appendChild(btn);
             });

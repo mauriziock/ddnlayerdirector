@@ -8,3 +8,8 @@ go2rtc
 .vscode
 .idea
 *.sh
+.env
+data/users.json
+data/config.json
+data/track_info_cache.json
+*.bak

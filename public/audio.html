@@ -122,34 +122,129 @@
         <span id="status-text" style="color:red">OFFLINE</span>
     </div>
 
+    <div id="debug-log"
+        style="font-size:10px; color:#0f0; max-height:100px; overflow-y:auto; width:90%; background:rgba(0,0,0,0.5); padding:5px; text-align:left; position:fixed; bottom:0; left:5%; z-index:10000;">
+    </div>
+
     <script>
         const socket = io();
 
+        socket.on('connect', () => {
+            if (currentTarget) {
+                log("Re-connected. Refreshing registration...");
+                if (mySourceId) {
+                    socket.emit('register', { role: mySourceId, target: currentTarget });
+                } else {
+                    socket.emit('register', { role: 'source_candidate', target: currentTarget });
+                }
+            }
+        });
+
+        const debugLog = document.getElementById('debug-log');
+        const roleList = document.getElementById('role-list');
+        const roleOverlay = document.getElementById('role-overlay');
+        const statusText = document.getElementById('status-text');
+        const roleDisplay = document.getElementById('role-display');
+        const micSelect = document.getElementById('mic-select');
+        const vuLevel = document.getElementById('vu-level');
+
+        window.onerror = function (msg, url, line) {
+            log(`CRITICAL JS ERROR: ${msg} (at ${line})`);
+            if (statusText) statusText.innerText = "JS ERROR: See Log";
+        };
+
+        function log(msg) {
+            console.log(msg);
+            if (socket && socket.connected) socket.emit('client_log', `[AUDIO-${mySourceId || '?'}]: ${msg}`);
+            if (debugLog) {
+                const line = document.createElement('div');
+                line.style.borderBottom = "1px solid rgba(0,243,255,0.1)";
+                line.style.padding = "2px 0";
+                line.innerHTML = `<span style="color:#666;">[${new Date().toLocaleTimeString()}]</span> ${msg}`;
+                debugLog.insertBefore(line, debugLog.firstChild);
+                if (debugLog.children.length > 50) debugLog.lastChild.remove();
+            }
+        }
+
+        // State
         let mySourceId = null;
+        let myDestSocketId = null; // Direct signaling target
         let localStream = null;
         let peerConnection = null;
         let audioContext, analyser, microphone, javascriptNode;
-
-        const roleList = document.getElementById('role-list');
-        const overlay = document.getElementById('role-overlay');
-        const roleDisplay = document.getElementById('role-display');
-        const statusText = document.getElementById('status-text');
-        const vuLevel = document.getElementById('vu-level');
-        const micSelect = document.getElementById('mic-select');
-
         const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
-        // 1. Initial Logic
-        socket.emit('register', 'source_candidate');
+        const urlParams = new URLSearchParams(window.location.search);
+        let currentTarget = urlParams.get('target');
+        let isLive = false; // "Initialize" button clicked?
 
-        socket.on('scene_update', (scene) => {
+        // 1. Initial Logic
+        if (!currentTarget) {
+            log("No target specified. Discovering channels...");
+            socket.emit('get_channels', (channels) => {
+                roleList.innerHTML = '';
+                if (!channels || channels.length === 0) {
+                    roleList.innerHTML = '<div style="color:#666;">No active channels found.</div>';
+                    return;
+                }
+                channels.forEach(channel => {
+                    const btn = document.createElement('button');
+                    btn.className = 'role-btn';
+                    btn.style.borderColor = '#ff0055';
+                    btn.innerHTML = `
+                        <div>CHANNEL: ${channel.name}</div>
+                        <div class="role-id">ID: ${channel.id}</div>
+                        <div class="role-icon">🌐</div>
+                    `;
+                    btn.onclick = () => {
+                        currentTarget = channel.id;
+                        document.querySelector('#role-overlay h2').innerText = "SELECT AUDIO ROLE";
+                        startRegistration();
+                    };
+                    roleList.appendChild(btn);
+                });
+            });
+        } else {
+            startRegistration();
+        }
+
+        function startRegistration() {
+            log(`Registering on target: ${currentTarget}`);
+            socket.emit('register', { role: 'source_candidate', target: currentTarget });
+        }
+
+        socket.on('scene_update', (data) => {
+            log("Received scene_update from target: " + (data.target || 'unknown'));
+            const scene = data.scene || data;
+            const incomingTarget = (data.target || '').toLowerCase();
+
+            if (currentTarget && incomingTarget !== currentTarget.toLowerCase()) return;
             if (mySourceId) return;
 
             const audioSlots = scene.layers.filter(l => l.type.includes('webrtc_audio'));
-            roleList.innerHTML = '';
 
+            // AUTO-JOIN LOGIC: If only one slot exists, offer a "START" button for gesture
+            if (audioSlots.length === 1) {
+                log(`Auto-Join candidate found: ${audioSlots[0].id}`);
+                roleList.innerHTML = '';
+                const btn = document.createElement('button');
+                btn.className = 'role-btn';
+                btn.style.background = '#ff0055';
+                btn.style.color = '#fff';
+                btn.style.textAlign = 'center';
+                btn.innerHTML = `
+                    <div style="font-weight:bold; font-size:1.5rem;">START AUTO-CONNECT</div>
+                    <div class="role-id">Targeting: ${audioSlots[0].id}</div>
+                    <div class="role-icon">⚡</div>
+                `;
+                btn.onclick = () => assignRole(audioSlots[0].source_id);
+                roleList.appendChild(btn);
+                return;
+            }
+
+            roleList.innerHTML = '';
             if (audioSlots.length === 0) {
-                roleList.innerHTML = '<div style="color:#666;">No audio slots available.</div>';
+                roleList.innerHTML = `<div style="color:#666;">No audio slots available in ${currentTarget}.</div>`;
                 return;
             }
 
@@ -167,11 +262,29 @@
         });
 
         function assignRole(id) {
+            log(`[HANDSHAKE] Step 1: ROL SELECCIONADO (${id}) - PREPARANDO MICRO...`);
             mySourceId = id;
-            overlay.style.display = 'none';
+            roleOverlay.style.display = 'none';
             roleDisplay.innerText = id.toUpperCase();
+
+            // Iniciar captura de audio inmediatamente para cumplir con gesto de seguridad
             initAudio();
+
+            // Auto-Start (Source Push)
+            isLive = true;
+            statusText.innerText = "AUTO-STARTING...";
+            statusText.style.color = "yellow";
+
+            // initAudio -> startStream -> createOffer will handle the rest.
         }
+
+        // 3. WebRTC Logic: Auto-Retry when Host appears
+        socket.on('host_online', (data) => {
+            if (isLive && mySourceId) {
+                log("[HANDSHAKE] Host appeared! Resending offer...");
+                createOffer();
+            }
+        });
 
         // 2. Audio Logic
         async function initAudio() {
@@ -188,20 +301,21 @@
                 const devices = await navigator.mediaDevices.enumerateDevices();
                 const mics = devices.filter(d => d.kind === 'audioinput');
 
-                console.log("Mics found:", mics);
+                log("Mics found: " + mics.length);
 
                 if (mics.length === 0) {
                     throw new Error("No audio input devices found in your system.");
                 }
 
                 micSelect.innerHTML = '';
-                mics.forEach(d => {
+                mics.forEach((d, idx) => {
                     const opt = document.createElement('option');
                     opt.value = d.deviceId;
-                    opt.text = d.label || `Mic ${micSelect.length + 1}`;
+                    opt.text = d.label || `Mic ${idx + 1}`;
                     micSelect.appendChild(opt);
                 });
 
+                log(`[HANDSHAKE] Step 2: Permission Granted & Mics Found (${mics.length})`);
                 // Start with the first one, but don't force 'ideal' if it might fail
                 startStream(mics[0].deviceId);
 
@@ -234,7 +348,7 @@
                     video: false
                 };
 
-                console.log("Starting stream with constraints:", constraints);
+                log("Starting stream with constraints: " + JSON.stringify(constraints));
                 localStream = await navigator.mediaDevices.getUserMedia(constraints);
 
                 // VU Meter Logic
@@ -267,12 +381,13 @@
                 statusText.innerText = "READY";
                 statusText.style.color = "#00f3ff";
 
+                log("[HANDSHAKE] Step 3: Local Stream Created OK");
                 // 2. Force renegotiation if already connected
                 if (peerConnection) {
                     const senders = peerConnection.getSenders();
                     const audioSender = senders.find(s => s.track && s.track.kind === 'audio');
                     if (audioSender) {
-                        console.log("Replacing track in existing connection...");
+                        log("Replacing track in existing connection...");
                         await audioSender.replaceTrack(localStream.getAudioTracks()[0]);
                     } else {
                         createOffer();
@@ -303,29 +418,60 @@
 
             peerConnection.onicecandidate = (event) => {
                 if (event.candidate) {
-                    socket.emit('candidate', { candidate: event.candidate, target: 'host', from: socket.id });
+                    socket.emit('candidate', {
+                        candidate: event.candidate,
+                        target: `host_${currentTarget}`,
+                        destSocketId: myDestSocketId,
+                        from: socket.id
+                    });
                 }
             };
 
-            const offer = await peerConnection.createOffer();
+            peerConnection.oniceconnectionstatechange = () => {
+                log(`[P2P] ICE State: ${peerConnection.iceConnectionState}`);
+            };
+
+            peerConnection.onconnectionstatechange = () => {
+                log(`[P2P] Connection: ${peerConnection.connectionState}`);
+                if (peerConnection.connectionState === 'connected') {
+                    statusText.innerText = "ON AIR";
+                    statusText.style.color = "#ff0055";
+                    log("P2P ESTABLISHED SUCCESSFULLY");
+                }
+            };
+
+            let offer = await peerConnection.createOffer();
+
+            // --- CALIDAD VDO.NINJA HACK (Alta fidelidad en audio) ---
+            let sdp = offer.sdp;
+            sdp = sdp.replace('useinbandfec=1', 'useinbandfec=1;stereo=1;maxaveragebitrate=510000;cbr=1');
+            offer = new RTCSessionDescription({ type: 'offer', sdp: sdp });
+
             await peerConnection.setLocalDescription(offer);
 
             statusText.innerText = "SIGNALING...";
             statusText.style.color = "yellow";
 
+            log("[HANDSHAKE] Step 3: ENVIANDO OFERTA P2P AL HOST");
             socket.emit('offer', {
                 sdp: offer,
                 type: 'audio',
                 from: socket.id,
-                sourceId: mySourceId
+                sourceId: mySourceId,
+                target: currentTarget,
+                destSocketId: myDestSocketId
             });
         }
 
+        // socket.on('request_offers') eliminado - El control es manual (Push)
+
         socket.on('answer', async (data) => {
             if (peerConnection) {
+                log(`[HANDSHAKE] Step 4: RESPUESTA RECIBIDA - CONECTANDO... (${data.from})`);
+                myDestSocketId = data.from; // Remember who answered
                 await peerConnection.setRemoteDescription(data.sdp);
-                statusText.innerText = "ON AIR";
-                statusText.style.color = "#ff0055";
+                statusText.innerText = "LINKING...";
+                statusText.style.color = "cyan";
             }
         });
 

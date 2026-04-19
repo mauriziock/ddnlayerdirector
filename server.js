@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const app = express();
 const http = require('http');
@@ -16,8 +17,52 @@ const bcrypt = require('bcryptjs');
 // --- AUTH & USERS SYSTEM ---
 const USERS_FILE = path.join(__dirname, 'data', 'users.json');
 const DATA_DIR = path.join(__dirname, 'data');
+const CONFIG_FILE = path.join(__dirname, 'data', 'config.json');
+const TRACK_CACHE_FILE = path.join(__dirname, 'data', 'track_info_cache.json');
+
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
 const SECURE_KEY = process.env.SESSION_SECRET || 'hangar_secret_key_change_me';
+
+// --- CONFIG SYSTEM ---
+let globalConfig = {
+    openrouterKey: process.env.OPENROUTER_KEY || '',
+    lastfmUser: 'mauriziock',
+    aiEnabled: false
+};
+
+function loadConfig() {
+    if (fs.existsSync(CONFIG_FILE)) {
+        try {
+            const data = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+            // Merge but prioritize environment variables for keys
+            Object.assign(globalConfig, data);
+            if (process.env.OPENROUTER_KEY) globalConfig.openrouterKey = process.env.OPENROUTER_KEY;
+        } catch (e) { console.error("Error loading config.json:", e); }
+    }
+}
+function saveConfig() {
+    const configToSave = { ...globalConfig };
+    // Don't save the API key if it's already in the environment
+    if (process.env.OPENROUTER_KEY) delete configToSave.openrouterKey;
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(configToSave, null, 2));
+}
+loadConfig();
+
+// --- TRACK CACHE SYSTEM ---
+let trackCache = {};
+function loadTrackCache() {
+    if (fs.existsSync(TRACK_CACHE_FILE)) {
+        try { trackCache = JSON.parse(fs.readFileSync(TRACK_CACHE_FILE, 'utf8')); }
+        catch (e) { console.error("Error loading track cache:", e); }
+    }
+}
+// --- LOGGING SYSTEM ---
+function botLog(msg, type = 'info') {
+    const timestamp = new Date().toLocaleTimeString();
+    const logObj = { timestamp, message: msg, type };
+    console.log(`[BOT-${type.toUpperCase()}] ${msg}`);
+    io.emit('bot_log', logObj);
+}
 
 // Session Middleware
 app.use(session({
@@ -224,11 +269,32 @@ function loadAndDiscoverDevices() {
 
 loadAndDiscoverDevices();
 
-function broadcastScene(target) {
+// --- AUTO-SYNC ON START ---
+// Wait 5 seconds for Go2RTC/MediaMTX to fully boot, then re-register all known devices
+setTimeout(async () => {
+    console.log("[STARTUP] Auto-syncing devices with Go2RTC...");
+    let successCount = 0;
+    for (const dev of devicesData) {
+        // Only attempt to sync relevant video types
+        if (dev.type === 'onvif_video' || dev.type === 'srt_video') {
+            if (await syncDeviceToGo2RTC(dev)) successCount++;
+        }
+    }
+    console.log(`[STARTUP] Sync complete. Registered ${successCount} active devices.`);
+}, 5000);
+
+function broadcastScene(targetInput) {
+    const target = targetInput.toLowerCase();
     const data = scenesData[target];
     if (!data) return;
     const scene = data.scenes[data.active_scene];
-    io.to(target).emit('scene_update', scene);
+    // Include channel state in the update
+    const payload = {
+        target,
+        scene,
+        state: data.state || {}
+    };
+    io.to(target).emit('scene_update', payload);
     // Also notify sources to update labels if needed
     io.emit('job_update', { target, scene });
 }
@@ -319,6 +385,23 @@ app.post('/api/devices', async (req, res) => {
     devicesData.push(newDevice);
     saveDevices();
     res.json(newDevice);
+});
+
+app.post('/api/devices/sync', async (req, res) => {
+    console.log("[API] Manual Sync requested for all devices");
+    let results = { success: 0, failed: 0, details: [] };
+
+    for (const dev of devicesData) {
+        const ok = await syncDeviceToGo2RTC(dev);
+        if (ok) {
+            results.success++;
+        } else {
+            results.failed++;
+            results.details.push({ id: dev.source_id, error: "Sync failed" });
+        }
+    }
+
+    res.json(results);
 });
 
 app.delete('/api/devices/:id', async (req, res) => {
@@ -475,6 +558,111 @@ app.get('/devices.html', requireAuth, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'devices.html'));
 });
 
+app.get('/settings.html', requireAuth, (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'settings.html'));
+});
+
+// --- CONFIG API ---
+app.get('/api/config', requireAuth, (req, res) => {
+    res.json(globalConfig);
+});
+
+app.post('/api/config', requireAuth, (req, res) => {
+    Object.assign(globalConfig, req.body);
+    saveConfig();
+    botLog(`Configuración actualizada. Bot habilitado: ${globalConfig.aiEnabled}`);
+    res.sendStatus(200);
+});
+
+app.post('/api/config/test', requireAuth, async (req, res) => {
+    const { api, key, user } = req.body;
+    botLog(`Probando conexión con ${api}...`);
+    try {
+        if (api === 'lastfm') {
+            const apiKey = process.env.LASTFM_API_KEY || '3c93be4fddcf1fef5e080971b8115cd9';
+            const r = await fetch(`https://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user=${user || globalConfig.lastfmUser}&api_key=${apiKey}&format=json&limit=1`);
+            const d = await r.json();
+            if (d.recenttracks) {
+                botLog("Conexión con Last.fm exitosa.");
+                return res.json({ success: true });
+            }
+            throw new Error(d.message || "Usuario inválido");
+        } else if (api === 'openrouter') {
+            const r = await fetch("https://openrouter.ai/api/v1/auth/key", {
+                headers: { "Authorization": `Bearer ${key}` }
+            });
+            if (r.ok) {
+                botLog("Conexión con OpenRouter exitosa.");
+                return res.json({ success: true });
+            }
+            throw new Error("API Key inválida.");
+        }
+    } catch (e) {
+        botLog(`Error en prueba de conexión: ${e.message}`, 'error');
+        res.status(400).json({ success: false, error: e.message });
+    }
+});
+
+// --- AI TRACK INFO API ---
+app.get('/api/track-info', async (req, res) => {
+    const { artist, track } = req.query;
+    if (!artist || !track) return res.status(400).send("Missing info");
+
+    if (!globalConfig.aiEnabled) {
+        botLog(`Petición ignorada: El bot está en modo STOP.`, 'info');
+        return res.status(503).json({ error: "BOT_STOPPED", message: "El bot está apagado en settings." });
+    }
+
+    const cacheId = `${artist}-${track}`.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (trackCache[cacheId]) {
+        botLog(`Cache Hit: ${artist} - ${track}`);
+        return res.json(trackCache[cacheId]);
+    }
+
+    if (!globalConfig.openrouterKey) {
+        botLog("Error: Intento de consulta sin API Key configurada.", "error");
+        return res.status(503).json({ error: "NO_KEY", message: "Falta la API Key de OpenRouter." });
+    }
+
+    botLog(`Solicitando análisis para: ${artist} - ${track}...`);
+    try {
+        const prompt = `You are a radio broadcast AI. Give me info about "${track}" by "${artist}".
+Format your response as a JSON object with two fields:
+1. "facts": 3 short, technical bullet points (max 10 words each) for an on-screen overlay.
+2. "script": A natural, conversational script (2-3 sentences) for the radio host to read.
+Style: Cyberpunk, techy, professional. Language: Spanish.`;
+
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${globalConfig.openrouterKey}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                model: "openai/gpt-oss-120b",
+                messages: [{ role: "user", content: prompt }],
+                response_format: { type: "json_object" }
+            })
+        });
+
+        if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.error?.message || `HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        const content = JSON.parse(data.choices[0].message.content);
+
+        trackCache[cacheId] = content;
+        saveTrackCache();
+        botLog(`Análisis completado para: ${track}`);
+        res.json(content);
+    } catch (e) {
+        botLog(`Error en análisis de IA: ${e.message}`, 'error');
+        res.status(500).json({ error: "AI_FAILURE", message: e.message });
+    }
+});
+
 // Serve everything else in /public
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -483,36 +671,77 @@ io.on('connection', (socket) => {
 
     // Register Role
     socket.on('register', (data) => {
-        // data can be a string (legacy) or an object { role: 'host', target: 'vertical' }
-        let role = typeof data === 'string' ? data : data.role;
-        let target = data.target || 'vertical';
+        let role, target, customName;
+        if (typeof data === 'string') {
+            role = data;
+            target = 'main';
+        } else {
+            role = data.role;
+            target = data.target || 'main';
+            customName = data.name;
+        }
+        const normalizedTarget = target.toLowerCase();
 
-        // Check if target exists, if not default to first avail or vertical
-        if (!scenesData[target] && role === 'host') {
-            // Fallback if requested target doesn't exist
-            // But for 'admin' we might be registering generic without specific target first?
-            // Actually admin switches targets.
+        // --- IDENTITY ENGINE ---
+        const ua = socket.handshake.headers['user-agent'] || '';
+        let deviceType = 'PC/Browser';
+        if (/iPhone|iPad|iPod/i.test(ua)) deviceType = 'iPhone/iPad';
+        else if (/Android/i.test(ua)) deviceType = 'Android';
+        else if (/OBS/i.test(ua)) deviceType = 'OBS-PC';
+
+        const clientIp = socket.handshake.address.replace('::ffff:', '');
+        const friendlyName = customName || `${deviceType} (${clientIp})`;
+
+        socket.HangarIdentity = {
+            role,
+            target: normalizedTarget,
+            deviceType,
+            ip: clientIp,
+            name: friendlyName
+        };
+
+        if (role === 'host' || role === 'admin' || role === 'source_candidate' || role.includes('source')) {
+            socket.join(normalizedTarget);
+            socket.join(`${role}_${normalizedTarget}`);
+            if (role === 'host') {
+                socket.join(`host_socket_${socket.id}`);
+                // ANNOUNCE PRESENCE TO ROOM: "I am the Host, I am here."
+                // This allows waiting sources to resend their offers.
+                console.log(`[SIGNAL] Host joined ${normalizedTarget}. Announcing presence.`);
+                socket.to(normalizedTarget).emit('host_online', { target: normalizedTarget });
+            }
         }
 
-        socket.join(role);
-        if (role === 'host' || role === 'admin') {
-            socket.join(target); // Join specific target room (vertical/landscape)
-            socket.join(`${role}_${target}`);
-        }
-
-        console.log(`Node Registered: ${role} on ${target} [${socket.id}]`);
+        console.log(`Node Registered: ${friendlyName} as ${role} on ${normalizedTarget} [${socket.id}]`);
+        socket.emit('registration_confirmed', { id: socket.id, identity: socket.HangarIdentity });
 
         // Send scene to the newcomer
-        const targetData = scenesData[target] || scenesData['vertical'];
-        socket.emit('scene_update', targetData.scenes[targetData.active_scene]);
+        const availableTargets = Object.keys(scenesData);
+        let finalTarget = normalizedTarget;
+        if (!scenesData[normalizedTarget]) {
+            // Fallback to first available target if requested one is missing
+            finalTarget = availableTargets.length > 0 ? availableTargets[0] : 'vertical';
+        }
+
+        const targetData = scenesData[finalTarget];
+        if (targetData) {
+            if (targetData) {
+                socket.emit('scene_update', {
+                    target: finalTarget,
+                    scene: targetData.scenes[targetData.active_scene],
+                    state: targetData.state || {}
+                });
+            }
+        }
     });
 
     // --- WebRTC Signaling ---
     const sourceCapabilities = {}; // { sourceId: [ {label, id} ] }
 
     socket.on('request_offers', (data) => {
-        // data might contain target
-        socket.broadcast.emit('request_offers');
+        const target = (data?.target || 'main').toLowerCase();
+        socket.to(target).emit('request_offers', { from: socket.id });
+        console.log(`[SIGNAL] request_offers broadcast to ${target}`);
     });
 
     socket.on('client_log', (msg) => {
@@ -542,27 +771,48 @@ io.on('connection', (socket) => {
     });
 
     socket.on('offer', (data) => {
-        // data: { sdp, type, from, sourceId }
-        console.log(`[SIGNAL] Offer from ${data.from} (${data.sourceId}) to Host`);
-        io.to('host').emit('offer', data);
+        // STRONG ENFORCEMENT: Use the socket's registered target, not what the client claims.
+        // This ensures if I registered for 'tiktok', I can ONLY talk to 'tiktok' host.
+        const registeredTarget = socket.HangarIdentity ? socket.HangarIdentity.target : null;
+        const target = (registeredTarget || data.target || 'main').toLowerCase();
+
+        // Update data packet to match reality
+        data.target = target;
+
+        console.log(`[DEBUG] Offer ID:${data.sourceId} Target:${target} (Enforced) DestSocket:${data.destSocketId || 'N/A'}`);
+        // console.log(`[DEBUG] Sender Rooms:`, Array.from(socket.rooms));
+
+        if (data.destSocketId) {
+            console.log(`[SIGNAL] Direct Offer to ${data.destSocketId}`);
+            io.to(data.destSocketId).emit('offer', data);
+        } else {
+            // FORCE BROADCAST to 'host_target' (e.g. host_tiktok)
+            const roomName = `host_${target}`;
+            console.log(`[SIGNAL] Routing Offer to ROOM: ${roomName}`);
+            io.to(roomName).emit('offer', data);
+        }
     });
 
     socket.on('answer', (data) => {
-        // data: { sdp, target }
-        console.log(`[SIGNAL] Answer to ${data.target}`);
-        io.to(data.target).emit('answer', { sdp: data.sdp });
+        // data: { sdp, target, destSocketId }
+        const destination = data.destSocketId || data.target;
+        console.log(`[SIGNAL] Answer to ${destination}`);
+        io.to(destination).emit('answer', { sdp: data.sdp, from: socket.id });
     });
 
     socket.on('candidate', (data) => {
-        // data: { candidate, target, from }
-        console.log(`[SIGNAL] ICE Candidate to ${data.target}`);
-        io.to(data.target).emit('candidate', { candidate: data.candidate, from: data.from });
+        // data: { candidate, target, from, destSocketId }
+        const destination = data.destSocketId || data.target;
+        console.log(`[SIGNAL] ICE Candidate to ${destination}`);
+        io.to(destination).emit('candidate', { candidate: data.candidate, from: socket.id });
     });
 
     // --- Scene Management (Admin -> Server -> Host) ---
     socket.on('update_layer', async (data) => {
         // data: { layerId, props, target }
-        const target = data.target || 'vertical';
+        const target = (data.target || 'main').toLowerCase();
+        if (!scenesData[target]) return console.error(`[UPDATE_LAYER] Invalid target: ${target}`);
+
         const activeLayout = scenesData[target].scenes[scenesData[target].active_scene];
         const layer = activeLayout.layers.find(l => l.id === data.layerId);
 
@@ -576,7 +826,10 @@ io.on('connection', (socket) => {
 
     socket.on('add_layer', async (data) => {
         // data: { newLayer, target }
-        const { newLayer, target = 'vertical' } = data;
+        const { newLayer } = data;
+        const target = (data.target || 'main').toLowerCase();
+        if (!scenesData[target]) return console.error(`[ADD_LAYER] Invalid target: ${target}`);
+
         const activeLayout = scenesData[target].scenes[scenesData[target].active_scene];
         if (activeLayout.layers.find(l => l.id === newLayer.id)) return;
 
@@ -585,9 +838,12 @@ io.on('connection', (socket) => {
         broadcastScene(target);
     });
 
-    socket.on('remove_layer', async (data) => {
+    socket.on('remove_layer', (data) => {
         // data: { layerId, target }
-        const { layerId, target = 'vertical' } = data;
+        const { layerId } = data;
+        const target = (data.target || 'main').toLowerCase();
+        if (!scenesData[target]) return;
+
         const activeLayout = scenesData[target].scenes[scenesData[target].active_scene];
         const layerIndex = activeLayout.layers.findIndex(l => l.id === layerId);
 
@@ -600,7 +856,8 @@ io.on('connection', (socket) => {
 
     socket.on('save_scene', (data) => {
         // data: { layout, target }
-        const { layout, target = 'vertical' } = data;
+        const { layout } = data;
+        const target = (data.target || 'main').toLowerCase();
         if (!scenesData[target]) return;
         scenesData[target].scenes[scenesData[target].active_scene] = layout;
         saveScenes();
@@ -708,7 +965,10 @@ io.on('connection', (socket) => {
         scenesData[channelId].state[key] = value;
 
         saveScenes(); // Persist state
-        // Broadcast to Hosts specifically
+        saveScenes(); // Persist state
+        // Broadcast to Hosts specifically - NOW including the full state object
+        io.to(channelId).emit('state_update', { state: scenesData[channelId].state });
+        // Also notify admins who might be watching
         io.emit('channel_state_changed', { channelId, state: scenesData[channelId].state });
     });
 

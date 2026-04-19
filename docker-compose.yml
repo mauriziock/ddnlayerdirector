@@ -1,6 +1,6 @@
 services:
   app:
-    build: .
+    image: hangar_mesh_app:latest
     container_name: hangar_mesh_app
     restart: unless-stopped
     # Conectamos a tu red de proxy para que NPM lo vea por nombre

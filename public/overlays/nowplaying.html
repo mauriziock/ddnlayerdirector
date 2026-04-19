@@ -3,134 +3,334 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>OBS Vertical Widget Top</title>
+    <title>DDN MX | Now Playing</title>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --cyan: #00f3ff;
+            --purple: #b537f2;
+            --red: #ff3333;
+            --bg-dark: rgba(5, 5, 8, 0.9);
+        }
+
         body {
             background-color: transparent;
             margin: 0;
             padding: 0;
             overflow: hidden;
-            font-family: 'Segoe UI', 'Roboto', monospace;
+            font-family: 'Share Tech Mono', monospace;
             display: flex;
             justify-content: center;
             align-items: center;
-            /* Centrado total */
             height: 100vh;
             width: 100vw;
             box-sizing: border-box;
         }
 
-        .container {
+        /* Contenedor Principal Full Responsive */
+        .player-card {
+            position: relative;
             display: flex;
             align-items: center;
-            width: 95%;
-            /* Ocupa casi todo el ancho de la capa */
-            background: rgba(0, 15, 20, 0.9);
-            border-top: 0.5vh solid #00f3ff;
-            border-bottom: 0.2vh solid rgba(0, 243, 255, 0.3);
-            padding: 2vh 3vw;
-            border-radius: 1vh;
-            gap: 3vw;
-            backdrop-filter: blur(8px);
-            box-shadow: 0 1vh 3vh rgba(0, 0, 0, 0.5);
+            width: 90%;
+            height: auto;
+            background: var(--bg-dark);
+            border: 1px solid rgba(0, 243, 255, 0.2);
+            padding: 8px 15px;
+            /* Reducción de padding vertical */
+            border-radius: 4px;
+            gap: 15px;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5),
+                inset 0 0 20px rgba(181, 55, 242, 0.1);
+            overflow: hidden;
             opacity: 0;
-            transform: translateY(-1vh);
-            transition: all 0.6s cubic-bezier(0.19, 1, 0.22, 1);
+            transform: scale(0.9) translateY(20px);
+            transition: all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
 
-        .container.active {
+        .player-card.active {
             opacity: 1;
-            transform: translateY(0);
+            transform: scale(1) translateY(0);
+        }
+
+        /* Album Art */
+        .art-container {
+            position: relative;
+            flex-shrink: 0;
+            width: 60px;
+            /* Reducido de 80px */
+            height: 60px;
+            /* Reducido de 80px */
+            border: 1px solid var(--cyan);
+            padding: 2px;
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.3);
         }
 
         #art {
-            width: 15vw;
-            /* Escala con el ancho de la capa */
-            height: 15vw;
-            max-width: 100px;
-            max-height: 100px;
-            border-radius: 0.5vh;
+            width: 100%;
+            height: 100%;
             object-fit: cover;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: block;
         }
 
+        /* Info de Canción */
         .metadata {
             display: flex;
             flex-direction: column;
             justify-content: center;
             overflow: hidden;
             flex-grow: 1;
+            z-index: 2;
         }
 
         .track-name {
-            font-size: 5vw;
-            /* Tipografía fluida */
+            font-size: 1.1rem;
+            /* Reducción de escala */
             font-weight: 800;
             color: #fff;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            line-height: 1.1;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+            margin-bottom: 2px;
+            width: 85%;
+            /* Espacio para el tag a la derecha */
         }
 
         .artist-name {
-            font-size: 3.5vw;
-            color: #00f3ff;
+            font-size: 0.9rem;
+            color: var(--cyan);
             font-weight: 500;
             text-transform: uppercase;
-            letter-spacing: 0.2vw;
+            letter-spacing: 2px;
+            opacity: 0.8;
         }
 
-        .audio-bus {
-            font-size: 2vw;
-            color: #555;
-            writing-mode: vertical-rl;
-            text-orientation: mixed;
-            border-left: 1px solid #333;
-            padding-left: 1vw;
+        /* --- Animación Estilo Avicii / Stream de Líneas --- */
+        .viz-container {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 20px;
+            overflow: hidden;
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .stream-line {
+            position: absolute;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--cyan), var(--purple), transparent);
+            width: 100%;
+            bottom: 5px;
+            filter: blur(1px);
+        }
+
+        .stream-line.l1 {
+            animation: stream-anim 1.5s infinite linear;
+            bottom: 4px;
+            opacity: 0.8;
+        }
+
+        .stream-line.l2 {
+            animation: stream-anim 2.5s infinite linear reverse;
+            bottom: 8px;
+            opacity: 0.4;
+        }
+
+        .stream-line.l3 {
+            animation: stream-anim 0.8s infinite linear;
+            bottom: 12px;
+            opacity: 0.6;
+            height: 1px;
+        }
+
+        @keyframes stream-anim {
+            0% {
+                transform: translateX(-100%);
+            }
+
+            100% {
+                transform: translateX(100%);
+            }
+        }
+
+        /* Decoración de Esquina */
+        .corner {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            border-color: var(--cyan);
+            border-style: solid;
+            opacity: 0.5;
+        }
+
+        .c-tr {
+            top: 5px;
+            right: 5px;
+            border-width: 2px 2px 0 0;
+        }
+
+        .c-bl {
+            bottom: 5px;
+            left: 5px;
+            border-width: 0 0 2px 2px;
+        }
+
+        /* Icono Live */
+        .live-tag {
+            position: absolute;
+            top: 50%;
+            right: 15px;
+            transform: translateY(-50%);
+            font-size: 0.6rem;
+            color: var(--red);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            letter-spacing: 1px;
+            font-weight: bold;
+            opacity: 0.8;
+        }
+
+        .dot {
+            width: 6px;
+            height: 6px;
+            background: var(--red);
+            border-radius: 50%;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.3;
+            }
+
+            100% {
+                opacity: 1;
+            }
+        }
+
+        /* Ajustes para diferentes tamaños de widget */
+        @media (max-width: 400px) {
+            .track-name {
+                font-size: 1.1rem;
+            }
+
+            .art-container {
+                width: 60px;
+                height: 60px;
+            }
         }
     </style>
 </head>
 
 <body>
 
-    <div id="widget" class="container">
-        <img id="art" src="" alt="art">
-        <div class="metadata">
-            <div id="track" class="track-name">ESPERANDO DATOS</div>
-            <div id="artist" class="artist-name">SISTEMA LISTO</div>
+    <div id="widget" class="player-card">
+        <div class="corner c-tr"></div>
+        <div class="corner c-bl"></div>
+
+        <div class="live-tag">
+            <div class="dot"></div>
+            AUDIO_STREAM
         </div>
-        <div class="audio-bus">CH_01</div>
+
+        <div class="art-container">
+            <img id="art" src="" alt="art">
+        </div>
+
+        <div class="metadata">
+            <div id="track" class="track-name">SISTEMA INICIADO</div>
+            <div id="artist" class="artist-name">ESPERANDO SEÑAL</div>
+        </div>
+
+        <!-- Animación de flujo de líneas (Estilo Avicii) -->
+        <div class="viz-container">
+            <div class="stream-line l1"></div>
+            <div class="stream-line l2"></div>
+            <div class="stream-line l3"></div>
+        </div>
     </div>
 
     <script>
-        const CONFIG = { apiKey: '3c93be4fddcf1fef5e080971b8115cd9', user: 'mauriziock', pollInterval: 5000 };
-        const elements = { widget: document.getElementById('widget'), art: document.getElementById('art'), track: document.getElementById('track'), artist: document.getElementById('artist') };
+        const CONFIG = {
+            apiKey: '3c93be4fddcf1fef5e080971b8115cd9',
+            user: 'mauriziock',
+            pollInterval: 5000
+        };
+
+        const elements = {
+            widget: document.getElementById('widget'),
+            art: document.getElementById('art'),
+            track: document.getElementById('track'),
+            artist: document.getElementById('artist')
+        };
+
         let currentTrackName = '';
 
         async function fetchNowPlaying() {
             try {
                 const res = await fetch(`https://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&user=${CONFIG.user}&api_key=${CONFIG.apiKey}&format=json&limit=1`);
                 const data = await res.json();
-                if (!data.recenttracks || !data.recenttracks.track.length) { hideWidget(); return; }
+
+                if (!data.recenttracks || !data.recenttracks.track.length) {
+                    hideWidget();
+                    return;
+                }
+
                 const track = data.recenttracks.track[0];
-                if (track['@attr'] && track['@attr'].nowplaying === 'true') updateDOM(track);
-                else hideWidget();
-            } catch (e) { console.error(e); }
+                const isNowPlaying = (track['@attr'] && track['@attr'].nowplaying === 'true');
+
+                if (isNowPlaying) {
+                    updateDOM(track);
+                } else {
+                    hideWidget();
+                }
+            } catch (e) {
+                console.error("Error fetching Last.fm:", e);
+            }
         }
 
         function updateDOM(track) {
-            if (currentTrackName === track.name) { if (!elements.widget.classList.contains('active')) showWidget(); return; }
-            currentTrackName = track.name;
-            elements.track.textContent = track.name;
-            elements.artist.textContent = track.artist['#text'];
-            const img = track.image[3]['#text'] || track.image[2]['#text'];
-            if (img) { elements.art.src = img; elements.art.style.display = 'block'; } else elements.art.style.display = 'none';
+            const trackTitle = track.name;
+            const artistName = track.artist['#text'];
+
+            // Si la canción cambió, actualizamos contenidos
+            if (currentTrackName !== trackTitle) {
+                currentTrackName = trackTitle;
+                elements.track.textContent = trackTitle;
+                elements.artist.textContent = artistName;
+
+                const img = track.image[3]['#text'] || track.image[2]['#text'];
+                if (img) {
+                    elements.art.src = img;
+                    elements.art.style.display = 'block';
+                } else {
+                    elements.art.style.display = 'none';
+                }
+            }
+
             showWidget();
         }
-        function showWidget() { elements.widget.classList.add('active'); }
-        function hideWidget() { elements.widget.classList.remove('active'); currentTrackName = ''; }
-        setInterval(fetchNowPlaying, CONFIG.pollInterval); fetchNowPlaying();
+
+        function showWidget() {
+            elements.widget.classList.add('active');
+        }
+
+        function hideWidget() {
+            elements.widget.classList.remove('active');
+            currentTrackName = '';
+        }
+
+        setInterval(fetchNowPlaying, CONFIG.pollInterval);
+        fetchNowPlaying();
     </script>
 </body>
 

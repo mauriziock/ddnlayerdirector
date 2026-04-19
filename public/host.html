@@ -99,6 +99,16 @@
             log("SOCKET ERROR: " + err.message);
         });
 
+        // RECONNECTION LOGIC: Re-join rooms if server restarts
+        socket.on('connect', () => {
+            log("SOCKET CONNECTED: " + socket.id);
+            if (!document.getElementById('overlay')) {
+                // If overlay is gone, we were already live. Re-register.
+                log("Re-registering Host session...");
+                socket.emit('register', { role: 'host', target: myTarget, name: myName });
+            }
+        });
+
         // --- AUTOPLAY UNLOCKER ---
         const overlay = document.createElement('div');
         overlay.id = 'init-overlay';
@@ -107,7 +117,8 @@
         document.body.appendChild(overlay);
 
         const urlParams = new URLSearchParams(window.location.search);
-        const myTarget = urlParams.get('target') || 'vertical';
+        const myTarget = (urlParams.get('target') || 'main').toLowerCase();
+        const myName = urlParams.get('name') || 'HOST-MAIN';
         const previewProgId = urlParams.get('preview');
 
         // State & Triggers Cache
@@ -150,9 +161,26 @@
         } else {
             // --- LIVE MODE ---
             overlay.onclick = () => {
+                log("[HANDSHAKE] Step 1: CLICK EN INITIALIZE DETECTADO");
                 overlay.remove();
-                socket.emit('register', { role: 'host', target: myTarget });
-                log(`ENGINE REGISTERED AS HOST (${myTarget.toUpperCase()})`);
+                socket.emit('register', { role: 'host', target: myTarget, name: myName });
+                log(`ENGINE REGISTERED AS ${myName} (${myTarget.toUpperCase()})`);
+
+                // log("[HANDSHAKE] Step 2: SOLICITANDO AUDIO/VIDEO A FUENTES...");
+                // socket.emit('request_offers', { target: myTarget }); // ELIMINADO: Host es pasivo
+
+                // Activar reproducción de cualquier elemento existente o futuro
+                const activateMedia = () => {
+                    const mediaEls = document.querySelectorAll('video, audio');
+                    mediaEls.forEach(m => {
+                        m.muted = false;
+                        m.play().catch(e => log("Media Play Error: " + e.message));
+                    });
+                };
+                activateMedia();
+                // Repetir brevemente por si llegan tracks justo ahora
+                setTimeout(activateMedia, 1000);
+                setTimeout(activateMedia, 3000);
 
                 // Fetch Initial State
                 socket.emit('get_channel_state', myTarget, (state) => {
@@ -171,7 +199,17 @@
         let firstSceneReceived = false;
 
         // --- 2. SCENE RENDERER ---
-        socket.on('scene_update', (scene) => {
+        socket.on('scene_update', (data) => {
+            const target = data.target || 'unknown';
+            const scene = data.scene || data;
+
+            log(`SCENE_UPDATE: ${target}`);
+
+            // Be slightly less strict on first load to ensure we get *something*
+            if (target !== myTarget && firstSceneReceived) {
+                return;
+            }
+
             currentScene = scene;
             renderScene(scene);
 
@@ -180,9 +218,7 @@
                 log("FIRST SCENE READY - REQUESTING OFFERS");
                 socket.emit('request_offers');
 
-                // If we have a program_id attached to the channel (assuming scene data might carry it in future, 
-                // but for now we rely on loose coupling or we fetching it)
-                // Actually, let's fetch program triggers for this channel
+                // If we have a program_id attached to the channel
                 socket.emit('get_channels', (channels) => {
                     const me = channels.find(c => c.id === myTarget);
                     if (me && me.program_id) {
@@ -457,9 +493,8 @@
             }
         };
 
-        // --- 4. WebRTC (Original P2P) ---
         socket.on('offer', async (data) => {
-            log(`WebRTC Offer from: ${data.sourceId} (${data.from})`);
+            log(`[HANDSHAKE] Step 3: OFERTA RECIBIDA de Source: ${data.sourceId} (${data.from})`);
 
             if (peers[data.from]) {
                 log(`Cleaning up old PC for ${data.from}`);
@@ -477,9 +512,18 @@
                     socket.emit('candidate', {
                         candidate: event.candidate,
                         target: data.from,
+                        destSocketId: data.from,
                         from: 'host'
                     });
                 }
+            };
+
+            pc.oniceconnectionstatechange = () => {
+                log(`[P2P] ICE State: ${pc.iceConnectionState}`);
+            };
+
+            pc.onconnectionstatechange = () => {
+                log(`[P2P] Connection: ${pc.connectionState}`);
             };
 
             pc.ontrack = (event) => {
@@ -494,9 +538,10 @@
                         if (el) {
                             const media = el.querySelector('video, audio');
                             if (media && media.srcObject !== stream) {
-                                log(`Attaching direct P2P stream to ${layer.id}`);
+                                log(`[HANDSHAKE] Adjuntando stream de ${data.sourceId} a la capa ${layer.id}`);
                                 media.srcObject = stream;
-                                media.play().catch(e => log(`Audio Play Error: ${e.message}`));
+                                media.muted = false; // Asegurar que no esté mudo al llegar
+                                media.play().catch(e => log(`Media Play Error: ${e.message}`));
                             }
                         }
                     } else {
@@ -510,10 +555,11 @@
                 const answer = await pc.createAnswer();
                 await pc.setLocalDescription(answer);
 
-                log(`Sending answer to ${data.from}`);
+                log(`[HANDSHAKE] Step 4: ENVIANDO RESPUESTA (ANSWER) a ${data.from}`);
                 socket.emit('answer', {
                     sdp: answer,
-                    target: data.from
+                    target: data.from,
+                    destSocketId: data.from
                 });
             } catch (e) {
                 log(`WebRTC Error: ${e.message}`);

@@ -1,23 +1,30 @@
 [
   {
-    "id": "migrated_17682588278950.8787847140941072",
-    "name": "Studio_CAM",
+    "id": "1768261670464",
+    "name": "webtortmp",
     "type": "onvif_video",
-    "source_id": "studio_cam",
-    "url": "rtsp://admin:15251809mM*@192.168.4.28:8554/Streaming/Channels/101"
+    "source_id": "mawpc",
+    "url": "rtmp://100.64.0.11:1935/live/test"
   },
   {
-    "id": "migrated_17682588278950.1588459430033009",
+    "id": "1769050018482",
     "name": "s25",
     "type": "srt_video",
     "source_id": "s25",
     "url": ""
   },
   {
-    "id": "1768261670464",
-    "name": "webtortmp",
+    "id": "1769674009309",
+    "name": "studio_cam",
     "type": "onvif_video",
-    "source_id": "mawpc",
-    "url": "rtmp://100.64.0.11:1935/live/test"
+    "source_id": "studio_cam",
+    "url": "rtsp://admin:15251809mM*@192.168.4.28:8554/Streaming/Channels/101"
+  },
+  {
+    "id": "1769675241319",
+    "name": "entrada",
+    "type": "onvif_video",
+    "source_id": "entrada",
+    "url": "rtsp://admin:L280CA85@192.168.4.27:554/cam/realmonitor?channel=1&subtype=0&unicast=true&proto=Onvif"
   }
 ]
