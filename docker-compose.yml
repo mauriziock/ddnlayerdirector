@@ -19,9 +19,9 @@ services:
     # ports:
     #   - "3000:3000" # Deshabilitado a petición: usar red npm_proxy
     volumes:
-      - /home/maw/infra/hangarclickclock/hangar-mesh/data:/app/data
-      - /home/maw/infra/hangarclickclock/hangar-mesh/public:/app/public
-      - /home/maw/infra/hangarclickclock/hangar-mesh/server.js:/app/server.js
+      - ${PROJECT_DIR}/data:/app/data
+      - ${PROJECT_DIR}/public:/app/public
+      - ${PROJECT_DIR}/server.js:/app/server.js
 
   go2rtc:
     image: alexxit/go2rtc:1.9.4
@@ -36,7 +36,7 @@ services:
       - "8555:8555/tcp" # WebRTC TCP Signaling
       - "8555:8555/udp" # WebRTC UDP (Importante para conexiones directas)
     volumes:
-      - /home/maw/infra/hangarclickclock/hangar-mesh/go2rtc.yaml:/config/go2rtc.yaml
+      - ${PROJECT_DIR}/go2rtc.yaml:/config/go2rtc.yaml
 
   mediamtx:
     image: bluenviron/mediamtx:1.9.3
@@ -50,7 +50,7 @@ services:
       - "8890:8890/udp" # SRT Ingest (CRÍTICO: UDP para el stream)
       - "9997:9997" # API
     volumes:
-      - /home/maw/infra/hangarclickclock/hangar-mesh/mediamtx.yml:/mediamtx.yml
+      - ${PROJECT_DIR}/mediamtx.yml:/mediamtx.yml
 
 networks:
   npm_proxy:
