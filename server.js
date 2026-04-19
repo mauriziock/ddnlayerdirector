@@ -328,7 +328,7 @@ function requireAuth(req, res, next) {
 
 // Go2RTC Configuration
 const GO2RTC_API = process.env.GO2RTC_API || 'http://127.0.0.1:1984';
-const MEDIAMTX_HOST = process.env.MEDIAMTX_HOST || '127.0.0.1'; // Use 'hangar_mesh_mediamtx' in Docker
+const MEDIAMTX_HOST = process.env.MEDIAMTX_HOST || '127.0.0.1'; // Use 'ddnlayerdirector_mediamtx' in Docker
 
 // Middleware for parsing text body (SDP)
 app.use(express.text());

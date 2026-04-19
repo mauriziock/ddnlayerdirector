@@ -1,7 +1,8 @@
 services:
   app:
-    image: hangar_mesh_app:latest
-    container_name: hangar_mesh_app
+    image: ddnlayerdirector_app:latest
+    build: .
+    container_name: ddnlayerdirector_app
     restart: unless-stopped
     # Conectamos a tu red de proxy para que NPM lo vea por nombre
     networks:
@@ -10,8 +11,8 @@ services:
     environment:
       - NODE_ENV=production
       # Como Go2RTC está en la misma red Docker, usamos su nombre de contenedor
-      - GO2RTC_API=http://hangar_mesh_go2rtc:1984
-      - MEDIAMTX_HOST=hangar_mesh_mediamtx
+      - GO2RTC_API=http://ddnlayerdirector_go2rtc:1984
+      - MEDIAMTX_HOST=ddnlayerdirector_mediamtx
       - SESSION_SECRET=change_this_to_something_secure_in_production
     expose:
       - "3000"
@@ -24,7 +25,7 @@ services:
 
   go2rtc:
     image: alexxit/go2rtc:1.9.4
-    container_name: hangar_mesh_go2rtc
+    container_name: ddnlayerdirector_go2rtc
     restart: unless-stopped
     networks:
       - npm_proxy
@@ -39,7 +40,7 @@ services:
 
   mediamtx:
     image: bluenviron/mediamtx:1.9.3
-    container_name: hangar_mesh_mediamtx
+    container_name: ddnlayerdirector_mediamtx
     restart: unless-stopped
     networks:
       - npm_proxy
